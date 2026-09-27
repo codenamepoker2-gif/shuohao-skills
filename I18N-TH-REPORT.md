@@ -99,3 +99,35 @@ Round 2 commits (all local on `feat/th-en-i18n`, author `codenamepoker2-gif`, no
 - `6c251fe` Art: render --cast runs the name-ban gate inside reports, Thai gate details
 - `15a8b09` Storyboard: all-English Seedance for non-Chinese content, Thai name boundaries, localized CLI, shotPrompt docs, ช็อต terminology
 - `d281f69` Docs: sync selftest counts and add root-README shotPrompt note
+
+## Round 3 (2026-09-27)
+
+Round 3 closes the two fixes from `.glm-brief-3.md`, both found on the live CineForge site. **No existing assertion was deleted or loosened** — the only expectation change is the single-episode gate (fix 1), which is the legitimate behaviour change itself, explained in the commit. No open questions came up; nothing needed escalation.
+
+### Fix 1 — single-episode outline could never pass the `major-early` gate (`c300ce9`)
+
+With `total === 1` the gate demanded a major beat before the last episode — impossible. The gate is now reported as **SKIPPED**, following the repo convention (「跳过要明说，不静默」): `ok: true` with a reason that the existing `isSkippedGate` predicate recognizes, localized per language —
+
+- zh 「只有 1 集，不适用」 · th 「มีตอนเดียว จึงไม่ต้องตรวจข้อนี้」 · en "Single-episode outline — not applicable"
+
+Skipped gates are excluded from both sides of the pass pill, so counts read "13/13 (1 skipped)"; HTML, Markdown, the gate alert and the CLI checkup all agree. `total ≥ 2` behaviour is untouched. Guarding tests: outline selftest — single-episode Thai fixture, skip reason + pill in th/en/zh HTML, Markdown, and `checkup` CLI in all three languages; the 2-episode case still passes the gate normally. 266 → **294**.
+
+### Fix 2 — Chinese gate detail text leaked into Thai/English reports (`df3737a`)
+
+`novel-outline` was the only skill whose gate *details* (failing-item reasons, template strings with episode numbers, risk-keyword names) rendered verbatim in th/en reports. The ad-hoc regex chains are replaced by ordered fragment tables (`GATE_DETAIL_TH` / `GATE_DETAIL_EN`) applied by a small `localize()` helper — table order carries the semantics (specific templates before generic fragments), and skip reasons resolve first via full-string maps so number templates can't mangle them. `gateText()` is now exported and feeds HTML, Markdown and the gate alert; skipped gates show their reason; the pass pill excludes skips.
+
+The other five skills were audited rather than changed: **novel-art, novel-script and novel-storyboard** already render a generic localized failure detail in th/en reports (leak-free by construction); **character-refs** shows only gate labels from its i18n table; **novel-characters** has no gates. So fix 2's production change is outline-only — the rest of the work is the regression net: every skill's selftest now renders a th and an en report of a Thai example with a deliberately broken gate and asserts the gate panel contains no CJK characters (`novel-characters` asserts it has no gate section; `character-refs` asserts its th/en gate label and staleness tables are CJK-free).
+
+### Final counts
+
+```sh
+for f in skills/*/scripts/selftest.mjs; do node "$f"; done
+node scripts/report-selftest.mjs
+```
+
+character-refs 248, novel-art 173, novel-characters 366, novel-outline 378, novel-script 187, novel-storyboard 349 — all passing; report assembler 113. Total **1,814** assertions, up from 1,686 at the end of Round 2 (fix 1 added 28, fix 2 added 100), with zero assertions deleted or loosened.
+
+Round 3 commits (local on `main`, author `codenamepoker2-gif`, **not pushed — the captain pushes**):
+
+- `c300ce9` Outline: single-episode outlines skip major-early instead of failing
+- `df3737a` Outline: localize every gate detail for Thai and English reports
