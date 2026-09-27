@@ -4,6 +4,7 @@
 //   node scripts/selftest.mjs
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +24,7 @@ import {
   seedFromOutline,
   TIER_TO_IMPORTANCE,
   needsUiTranslation,
+  promptContainsCharacterName,
   slug,
   strings,
   uiTemplate,
@@ -38,6 +40,7 @@ const SOURCE = readFileSync(join(examples, '渡口.txt'), 'utf8').replace(/\r\n/
 const CAST = JSON.parse(readFileSync(join(examples, '渡口-cast.json'), 'utf8')).characters;
 const THAI_DOC = JSON.parse(readFileSync(join(examples, 'สะพาน-cast.json'), 'utf8'));
 const THAI_SOURCE = readFileSync(join(examples, 'สะพาน.txt'), 'utf8');
+const cliPath = join(here, 'novel-characters.mjs');
 
 let passed = 0;
 function ok(condition, label) {
@@ -854,5 +857,40 @@ ok(/data-src="images\/x-sheet\.png"/.test(sheetHtml), '弹层拿到图片地址'
 ok(/class="copy-img" data-img="images\/x-sheet\.png"/.test(sheetHtml), '图上有复制按钮');
 ok(sheetHtml.includes('ClipboardItem'), '复制的是图片本身而不是路径');
 ok(/blob\.type !== 'image\/png'/.test(sheetHtml), '非 PNG 先转码——Safari 只认 image/png');
+
+/* ---------------- ภาษาไทย：ชื่อบุคคล + CLI + typography ---------------- */
+
+ok(promptContainsCharacterName('ต้น', 'ต้น', 'th'), '泰文独立名字ต้น会命中');
+ok(!promptContainsCharacterName('ใต้ต้นไม้ริมทาง', 'ต้น', 'th'), '泰文普通词ต้นไม้不误报名字ต้น');
+ok(!promptContainsCharacterName('วัยต้นสามสิบและตอนต้นเรื่อง', 'ต้น', 'th'), '泰文วัยต้นสามสิบ与ตอนต้น不误报名字ต้น');
+ok(promptContainsCharacterName('ฝน', 'ฝน', 'th'), '泰文独立名字ฝน会命中');
+ok(!promptContainsCharacterName('ฝนตกหนัก', 'ฝน', 'th'), '泰文普通词ฝนตก不误报名字ฝน');
+ok('Alexander'.includes('Al') && promptContainsCharacterName('Alexander', 'Al', 'en'), '英文继续沿用子串匹配');
+ok(promptContainsCharacterName('老周的设定图', '老周', 'zh'), '中文继续沿用子串匹配');
+
+{
+  const ordinary = JSON.parse(JSON.stringify(THAI_DOC.characters));
+  const ton = ordinary.find((c) => c.name === 'ต้น') ?? ordinary[0];
+  ton.name = 'ต้น';
+  ton.aliases = [];
+  ton.image.promptLocal = 'ชายวัยต้นสามสิบยืนใต้ต้นไม้ริมทาง';
+  ok(!validateCast(ordinary, THAI_SOURCE, 'th').some((x) => /image\.promptLocal.*人名「ต้น」/.test(x)), '泰文角色门允许普通复合词中的ต้น');
+  ton.image.promptLocal = 'ภาพตัวละคร ต้น ยืนริมทาง';
+  ok(validateCast(ordinary, THAI_SOURCE, 'th').some((x) => /image\.promptLocal.*人名「ต้น」/.test(x)), '泰文角色门仍拦独立出现的ต้น');
+}
+
+{
+  const thHtml = renderHtml(THAI_DOC.characters, THAI_DOC.source, THAI_DOC.summary, 'th', null, 'th');
+  ok(thHtml.includes('html[lang="th"] h1') && thHtml.includes('letter-spacing:normal'), '泰文标题与标签关闭字距');
+  const helpTh = spawnSync(process.execPath, [cliPath, '--help', '--lang', 'th'], { encoding: 'utf8' });
+  eq(helpTh.status, 0, '泰文帮助命令成功');
+  ok(helpTh.stdout.includes('เครื่องมือจัดทำและตรวจตัวละคร') && !/[\u3400-\u9fff]/u.test(helpTh.stdout), '泰文帮助没有中文界面文案');
+  const validTh = spawnSync(process.execPath, [cliPath, 'validate', join(examples, 'สะพาน-cast.json'), join(examples, 'สะพาน.txt'), '--lang', 'th'], { encoding: 'utf8' });
+  eq(validTh.status, 0, '泰文 CLI 校验成功');
+  ok(validTh.stdout.includes('ผ่านการตรวจสอบทั้งหมด') && !/[\u3400-\u9fff]/u.test(validTh.stdout), '泰文 CLI 通过摘要没有中文');
+  const helpEn = spawnSync(process.execPath, [cliPath, '--help', '--lang', 'en'], { encoding: 'utf8' });
+  eq(helpEn.status, 0, '英文帮助命令成功');
+  ok(helpEn.stdout.includes('deterministic character tools') && !/[\u3400-\u9fff]/u.test(helpEn.stdout), '英文帮助没有中文界面文案');
+}
 
 console.log(`✓ ${passed} 项自测全部通过`);

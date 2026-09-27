@@ -542,6 +542,28 @@ const HUMAN_VOICE_FIELDS = ['timbre', 'pitch', 'pace', 'accent', 'emotion', 'ref
 
 const normalise = (s) => String(s).replace(/\s+/g, '');
 
+/** Keep legacy substring matching for zh/en; Thai names must occupy a word segment. */
+export function promptContainsCharacterName(value, name, contentLang = DEFAULT_CONTENT_LANG) {
+  const text = String(value ?? '');
+  const needle = String(name ?? '').trim();
+  if (!needle) return false;
+  if (contentLang !== 'th') return text.includes(needle);
+  const segments = [...new Intl.Segmenter('th', { granularity: 'word' }).segment(text)]
+    .filter((part) => part.isWordLike);
+  return segments.some((part, i) => {
+    if (part.segment !== needle) return false;
+    // Intl correctly keeps ต้นไม้/ฝนตก whole, but splits a few ordinary lexical
+    // phrases such as ตอนต้น and วัยต้นสามสิบ. These are vocabulary, not a cast
+    // mention; keep the narrow exception here instead of weakening every name.
+    if (needle === 'ต้น' && (
+      ['ตอน', 'วัย', 'เริ่ม', 'เบื้อง'].includes(segments[i - 1]?.segment)
+      || segments[i + 1]?.segment.startsWith('ไม้')
+    )) return false;
+    if (needle === 'ฝน' && segments[i + 1]?.segment.startsWith('ตก')) return false;
+    return true;
+  });
+}
+
 /**
  * @param characters 角色卡数组
  * @param sourceText 原文；null 则跳过逐字引文校验
@@ -683,7 +705,7 @@ export function validateCast(characters, sourceText, contentLang = DEFAULT_CONTE
         const value = image[field];
         if (typeof value !== 'string') continue;
         for (const n of names) {
-          if (value.includes(n)) at(name, `image.${field} 里出现了人名「${n}」`);
+          if (promptContainsCharacterName(value, n, contentLang)) at(name, `image.${field} 里出现了人名「${n}」`);
         }
       }
     }
@@ -1168,6 +1190,10 @@ body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.7 var(--sans)
   -webkit-font-smoothing:antialiased}
 h1,h2,h3,h4{margin:0;font-weight:400}
 button{font-family:inherit}
+html[lang="th"] h1,html[lang="th"] h2,html[lang="th"] h3,html[lang="th"] h4,
+html[lang="th"] .lbl,html[lang="th"] .syn-more,html[lang="th"] .rost-name,
+html[lang="th"] .plate-c,html[lang="th"] .tag-en,html[lang="th"] .glabtoggle,
+html[lang="th"] .grow b{letter-spacing:normal}
 
 /* ---------- 顶栏 ---------- */
 .top{position:sticky;top:0;z-index:20;height:var(--top);display:flex;align-items:center;gap:24px;
@@ -1688,6 +1714,93 @@ render 选项：
   --images <dir>    设定图所在目录，任意路径（相对当前目录解析）；默认 cast.json 同级的 images/
                     会去找 <dir>/<slug>-sheet.png；报告里的图片路径按「报告写在 cast.json 旁边」计算`;
 
+const CLI_TEXT = {
+  zh: {
+    usage: USAGE,
+    failed: (n) => `✗ ${n} 处违规：\n`,
+    passed: (n, lang, contentLang) => `✓ ${n} 个角色全部通过校验（lang=${lang}, contentLang=${contentLang}）`,
+    assembled: (n, path) => `✓ ${n} 个角色 → ${path}`,
+    noSource: '⚠️ 没给原文，跳过逐字引文校验',
+    noOrder: (path) => `⚠️ 没有 --order 也没有 ${path}，同档角色将按文件名序而不是戏份序`,
+  },
+  th: {
+    usage: `novel-characters.mjs — เครื่องมือจัดทำและตรวจตัวละคร\n\n  seed <outline.json>\n  chunk <book.txt> <workdir> [--lang th]\n  merge <workdir> [--apply merges.json] [--lang th]\n  assemble <workdir> --source <ชื่อเรื่อง> [--lang th] [--content-lang th] [--out cast.json]\n  validate <cast.json> <book.txt> [--lang th] [--content-lang th]\n  render <cast.json> [--html|--md] [--lang th]\n  slug <name>\n  ui-template [lang]`,
+    failed: (n) => `✗ พบข้อผิดพลาด ${n} รายการ:\n`,
+    passed: (n, lang, contentLang) => `✓ ตัวละคร ${n} ตัวผ่านการตรวจสอบทั้งหมด (lang=${lang}, contentLang=${contentLang})`,
+    assembled: (n, path) => `✓ รวมตัวละคร ${n} ตัว → ${path}`,
+    noSource: '⚠️ ไม่ได้ให้ต้นฉบับ จึงข้ามการตรวจข้อความอ้างอิงแบบคำต่อคำ',
+    noOrder: (path) => `⚠️ ไม่ได้ให้ --order และไม่พบ ${path} ตัวละครระดับเดียวกันจึงเรียงตามชื่อไฟล์แทนลำดับความสำคัญ`,
+  },
+  en: {
+    usage: `novel-characters.mjs — deterministic character tools\n\n  seed <outline.json>\n  chunk <book.txt> <workdir> [--lang en]\n  merge <workdir> [--apply merges.json] [--lang en]\n  assemble <workdir> --source <title> [--lang en] [--content-lang en] [--out cast.json]\n  validate <cast.json> <book.txt> [--lang en] [--content-lang en]\n  render <cast.json> [--html|--md] [--lang en]\n  slug <name>\n  ui-template [lang]`,
+    failed: (n) => `✗ ${n} validation error(s):\n`,
+    passed: (n, lang, contentLang) => `✓ All ${n} characters passed validation (lang=${lang}, contentLang=${contentLang})`,
+    assembled: (n, path) => `✓ Assembled ${n} characters → ${path}`,
+    noSource: '⚠️ No source text provided; verbatim quotation checks were skipped',
+    noOrder: (path) => `⚠️ No --order and no ${path}; characters within a tier will follow filename order instead of prominence`,
+  },
+};
+
+const cliFor = (lang) => CLI_TEXT[lang] ?? CLI_TEXT.en;
+
+function cliProblemText(message, lang) {
+  const text = String(message);
+  if (lang === 'zh') return text;
+  const exact = lang === 'th'
+    ? {
+        'cast 为空或不是数组': 'cast ว่างหรือไม่ใช่อาร์เรย์',
+        '缺少 name': 'ขาด name', '缺少 oneLiner': 'ขาด oneLiner', '缺少 persona': 'ขาด persona',
+        '缺少 image': 'ขาด image', '缺少 voice': 'ขาด voice',
+        'persona.personality 必须是数组': 'persona.personality ต้องเป็นอาร์เรย์',
+        'persona.relationships 必须是数组': 'persona.relationships ต้องเป็นอาร์เรย์',
+        'persona.evidence 必须是数组': 'persona.evidence ต้องเป็นอาร์เรย์',
+        'image.tags 必须是数组': 'image.tags ต้องเป็นอาร์เรย์',
+        'persona.evidence 里有非字符串': 'persona.evidence มีค่าที่ไม่ใช่ข้อความ',
+        '顶层缺少 summary（故事摘要），报告顶部会空着': 'ขาด summary ระดับบนสุด ส่วนบนของรายงานจะว่าง',
+      }
+    : {
+        'cast 为空或不是数组': 'cast is empty or is not an array',
+        '缺少 name': 'missing name', '缺少 oneLiner': 'missing oneLiner', '缺少 persona': 'missing persona',
+        '缺少 image': 'missing image', '缺少 voice': 'missing voice',
+        'persona.personality 必须是数组': 'persona.personality must be an array',
+        'persona.relationships 必须是数组': 'persona.relationships must be an array',
+        'persona.evidence 必须是数组': 'persona.evidence must be an array',
+        'image.tags 必须是数组': 'image.tags must be an array',
+        'persona.evidence 里有非字符串': 'persona.evidence contains a non-string value',
+        '顶层缺少 summary（故事摘要），报告顶部会空着': 'top-level summary is missing; the report header will be empty',
+      };
+  const prefix = text.match(/^(\[[^\]]*\]\s*)/)?.[1] ?? '';
+  const body = prefix ? text.slice(prefix.length) : text;
+  if (exact[body]) return prefix + exact[body];
+  const rules = lang === 'th'
+    ? [
+        [/^(\S+) 缺失或为空(.*)$/, '$1 ขาดหายหรือว่าง$2'],
+        [/^(\S+) 必须是数组$/, '$1 ต้องเป็นอาร์เรย์'],
+        [/^(\S+) 必须是 ([^，]+)，实际是 (.+)$/, '$1 ต้องเป็น $2 แต่ได้รับ $3'],
+        [/^image\.(\S+) 里出现了人名「(.+)」$/, 'image.$1 มีชื่อตัวละคร「$2」'],
+        [/^(\S+) 是喂给模型的，必须英文，但含中日韩或泰文字符$/, '$1 เป็นข้อมูลสำหรับโมเดลและต้องเป็นภาษาอังกฤษ แต่มีอักษรจีน ญี่ปุ่น เกาหลี หรือไทย'],
+        [/^image\.tags 必须英文，但「(.+)」含中日韩或泰文字符$/, 'image.tags ต้องเป็นภาษาอังกฤษ แต่「$1」มีอักษรจีน ญี่ปุ่น เกาหลี หรือไทย'],
+        [/^引文不是原文逐字片段：(.+)$/, 'ข้อความอ้างอิงไม่ตรงกับต้นฉบับแบบคำต่อคำ: $1'],
+        [/^(.+) 与 (.+) 的(出图提示词|音色提示词)雷同 (\d+)%（上限 (\d+)%）——同一批角色要能区分开，别套同一个模板$/, '$1 และ $2 มีพรอมต์คล้ายกัน $4% (ขีดจำกัด $5%); ตัวละครชุดเดียวกันต้องแยกจากกันได้'],
+      ]
+    : [
+        [/^(\S+) 缺失或为空(.*)$/, '$1 is missing or empty$2'],
+        [/^(\S+) 必须是数组$/, '$1 must be an array'],
+        [/^(\S+) 必须是 ([^，]+)，实际是 (.+)$/, '$1 must be $2; received $3'],
+        [/^image\.(\S+) 里出现了人名「(.+)」$/, 'image.$1 contains the character name “$2”'],
+        [/^(\S+) 是喂给模型的，必须英文，但含中日韩或泰文字符$/, '$1 is model-facing and must be English, but contains CJK or Thai characters'],
+        [/^image\.tags 必须英文，但「(.+)」含中日韩或泰文字符$/, 'image.tags must be English, but “$1” contains CJK or Thai characters'],
+        [/^引文不是原文逐字片段：(.+)$/, 'quotation is not a verbatim source excerpt: $1'],
+        [/^(.+) 与 (.+) 的(出图提示词|音色提示词)雷同 (\d+)%（上限 (\d+)%）——同一批角色要能区分开，别套同一个模板$/, '$1 and $2 have $4% similar prompts (limit $5%); characters in one cast must remain distinguishable'],
+      ];
+  for (const [pattern, replacement] of rules) {
+    if (pattern.test(body)) return prefix + body.replace(pattern, replacement);
+  }
+  return prefix + body;
+}
+
+let activeCliLang = 'zh';
+
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(path), 'utf8'));
 }
@@ -1715,9 +1828,11 @@ function loadCast(path) {
 
 function main(argv) {
   const [cmd, ...rest] = argv;
+  const explicitLang = flag(argv, '--lang', null);
+  activeCliLang = explicitLang ?? 'zh';
 
   if (!cmd || cmd === '-h' || cmd === '--help') {
-    console.log(USAGE);
+    console.log(cliFor(activeCliLang).usage);
     process.exit(cmd ? 0 : 1);
   }
 
@@ -1779,6 +1894,8 @@ function main(argv) {
     const sourceName = flag(rest, '--source');
     if (!sourceName) throw new Error('assemble 需要 --source <书名>');
     const lang = flag(rest, '--lang', DEFAULT_LANG);
+    activeCliLang = lang;
+    const cli = cliFor(lang);
     const contentLang = flag(rest, '--content-lang', DEFAULT_CONTENT_LANG);
 
     const files = readdirSync(dir).filter((f) => /^card-.*\.json$/.test(f)).sort();
@@ -1828,12 +1945,12 @@ function main(argv) {
       const list = Array.isArray(raw) ? raw : (raw.characters ?? []);
       order = list.map((e) => (typeof e === 'string' ? e : e?.name)).filter(Boolean);
     } else {
-      console.error(`⚠️ 没有 --order 也没有 ${join(dir, 'merged.json')}，同档角色将按文件名序而不是戏份序`);
+      console.error(cli.noOrder(join(dir, 'merged.json')));
     }
 
     if (problems.length) {
-      console.error(`✗ ${problems.length} 处问题：\n`);
-      for (const p of problems) console.error('  ' + p);
+      console.error(cli.failed(problems.length));
+      for (const p of problems) console.error('  ' + cliProblemText(p, lang));
       process.exit(1);
     }
 
@@ -1842,7 +1959,7 @@ function main(argv) {
     const out = flag(rest, '--out');
     if (out) {
       writeFileSync(resolve(out), json, 'utf8');
-      console.log(`✓ ${cast.characters.length} 个角色 → ${resolve(out)}`);
+      console.log(cli.assembled(cast.characters.length, resolve(out)));
     } else {
       process.stdout.write(json);
     }
@@ -1854,9 +1971,11 @@ function main(argv) {
     if (!castPath) throw new Error('用法：validate <cast.json> <book.txt>');
     const { characters, summary, lang: castLang, contentLang: castContentLang, ui } = loadCast(castPath);
     const lang = flag(rest, '--lang', castLang);
+    activeCliLang = lang;
+    const cli = cliFor(lang);
     const contentLang = flag(rest, '--content-lang', castContentLang);
     const source = bookPath ? readFileSync(resolve(bookPath), 'utf8') : null;
-    if (!bookPath) console.error('⚠️ 没给原文，跳过逐字引文校验');
+    if (!bookPath) console.error(cli.noSource);
     const problems = validateCast(characters, source, contentLang);
     // 顶层的故事摘要——报告要用，缺了就没法在顶部交代背景
     if (typeof summary !== 'string' || !summary.trim()) {
@@ -1871,11 +1990,11 @@ function main(argv) {
       );
     }
     if (problems.length) {
-      console.error(`✗ ${problems.length} 处违规：\n`);
-      for (const p of problems) console.error('  ' + p);
+      console.error(cli.failed(problems.length));
+      for (const p of problems) console.error('  ' + cliProblemText(p, lang));
       process.exit(1);
     }
-    console.log(`✓ ${characters.length} 个角色全部通过校验（lang=${lang}, contentLang=${contentLang}）`);
+    console.log(cli.passed(characters.length, lang, contentLang));
     return;
   }
 
@@ -1950,7 +2069,7 @@ if (isMainModule()) {
   try {
     main(process.argv.slice(2));
   } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
+    console.error(cliProblemText(error instanceof Error ? error.message : error, activeCliLang));
     process.exit(1);
   }
 }
