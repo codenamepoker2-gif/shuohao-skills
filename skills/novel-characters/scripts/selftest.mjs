@@ -15,6 +15,7 @@ import {
   assembleCast,
   buildGraph,
   chunkText,
+  contentLength,
   mergeCandidates,
   mergeRoster,
   renderHtml,
@@ -35,6 +36,8 @@ const examples = join(here, '..', 'examples');
 // 「块内容来自原文」「覆盖全文」两条会假失败——issue #8。
 const SOURCE = readFileSync(join(examples, '渡口.txt'), 'utf8').replace(/\r\n/g, '\n');
 const CAST = JSON.parse(readFileSync(join(examples, '渡口-cast.json'), 'utf8')).characters;
+const THAI_DOC = JSON.parse(readFileSync(join(examples, 'สะพาน-cast.json'), 'utf8'));
+const THAI_SOURCE = readFileSync(join(examples, 'สะพาน.txt'), 'utf8');
 
 let passed = 0;
 function ok(condition, label) {
@@ -591,6 +594,7 @@ ok(/@media print\{[\s\S]*\.pr p\{display:block!important/.test(css), '打印时�
 
 const zh = renderHtml(CAST, '渡口', DOC.summary, 'zh');
 const en = renderHtml(CAST, 'Ferry', 'A misty river crossing.', 'en');
+const th = renderHtml(THAI_DOC.characters, THAI_DOC.source, THAI_DOC.summary, 'th', null, 'th');
 
 ok(zh.includes('lang="zh"'), 'zh 报告的 html lang 正确');
 ok(en.includes('lang="en"'), 'en 报告的 html lang 正确');
@@ -602,13 +606,17 @@ ok(en.includes('Cast · by prominence'), 'en 的角色列表标题翻译了');
 ok(/Appearance|Temperament/.test(en), 'en 的画像小节标题翻译了');
 ok(en.includes('>Lead<'), 'en 的 importance 标签翻译了');
 ok(en.includes('>Copy<'), 'en 的复制按钮翻译了');
+ok(th.includes('lang="th"'), 'th 报告的 html lang 正确');
+ok(th.includes('เรื่องย่อ') && th.includes('แผนผังความสัมพันธ์'), 'th 报告界面使用自然泰文');
+ok(th.includes('ค้นหาตัวละคร') && th.includes('>คัดลอก<'), 'th 搜索与复制控件均已翻译');
 // 未知语言码退回英文骨架，而不是崩掉或露出中文
 const fr = renderHtml(CAST, 'Bac', '', 'fr');
 ok(fr.includes('lang="fr"'), '未知语言码仍写进 html lang');
 ok(fr.includes('Synopsis') || !fr.includes('故事摘要'), '未知语言码用英文界面骨架');
 eq(strings('zh').synopsis, '故事摘要', 'strings(zh)');
 eq(strings('nope').synopsis, strings('en').synopsis, 'strings 未知码退回 en');
-for (const l of ['zh', 'en', 'ja']) ok(SUPPORTED_UI_LANGS.includes(l), `内置 ${l} 界面`);
+for (const l of ['zh', 'th', 'en', 'ja']) ok(SUPPORTED_UI_LANGS.includes(l), `内置 ${l} 界面`);
+ok(!needsUiTranslation('th'), 'th 内置，不需要 ui 翻译');
 
 // 日语内置
 const ja = renderHtml(CAST, '渡し場', 'あらすじの本文', 'ja');
@@ -660,6 +668,13 @@ ok(
   validateCast(CAST, SOURCE, 'en').filter((p) => p.includes('应为英文')).length > 0,
   'lang=en 时中文 voice 字段违规',
 );
+eq(validateCast(THAI_DOC.characters, THAI_SOURCE, 'th').length, 0, '泰文角色资料与泰文逐字引文通过全部校验');
+ok(validateCast(THAI_DOC.characters, THAI_SOURCE, 'zh').some((p) => p.includes('应为中文')), '泰文内容不会绕过中文内容门');
+const thaiMachine = structuredClone(THAI_DOC.characters);
+thaiMachine[0].image.prompt = 'ชายไทยยืนบนพื้นหลังสีขาว';
+ok(validateCast(thaiMachine, THAI_SOURCE, 'th').some((p) => p.includes('必须英文')), '泰文出图提示词仍被英文机器字段门拦截');
+eq(contentLength('ก้', 'th'), 1, '泰文长度忽略组合元音与声调符号');
+eq(contentLength('中文', 'zh'), 2, '中文长度计数保持不变');
 // 机器字段不受 lang 影响，永远必须英文
 const cjkMachine = clone();
 cjkMachine[0].image.prompt = '中文出图提示词';

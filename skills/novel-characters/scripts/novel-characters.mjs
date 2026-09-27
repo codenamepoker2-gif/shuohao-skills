@@ -198,6 +198,7 @@ export function slug(name) {
  */
 
 export const DEFAULT_LANG = 'zh';
+export const DEFAULT_CONTENT_LANG = 'zh';
 
 const STRINGS = {
   zh: {
@@ -302,6 +303,57 @@ const STRINGS = {
     zoomImage: 'View larger',
     copyImage: 'Copy image',
     closeImage: 'Close',
+  },
+  th: {
+    kicker: 'คู่มือตัวละคร',
+    titleTail: ' · ตัวละคร',
+    docTitle: (s) => `${s} · คู่มือตัวละคร`,
+    counts: (n, shots) => `${n} ตัวละคร${shots ? ` · ภาพตั้งต้น ${shots} ภาพ` : ''} · เรียงตามบทบาทในเรื่อง`,
+    synopsis: 'เรื่องย่อ',
+    indexLabel: 'รายชื่อตัวละคร',
+    aka: 'ชื่ออื่น',
+    groups: { persona: 'ประวัติตัวละคร', image: 'รูปลักษณ์', voice: 'เสียง' },
+    persona: {
+      gender: 'เพศ', ageRange: 'อายุ', identity: 'สถานะ',
+      appearance: 'รูปลักษณ์', temperament: 'นิสัย', motivation: 'แรงจูงใจ',
+      arc: 'พัฒนาการตัวละคร', relationships: 'ความสัมพันธ์', evidence: 'หลักฐานจากต้นฉบับ',
+    },
+    image: {
+      prompt: 'พรอมต์ภาพ · ส่งข้อความนี้ให้โมเดลสร้างภาพ', promptLocal: 'พรอมต์ภาพ (คำแปล)',
+      negative: 'พรอมต์เชิงลบ', sheet: 'พรอมต์แผ่นแบบตัวละคร',
+    },
+    voice: {
+      timbre: 'ลักษณะเสียง', pitch: 'ระดับเสียง', pace: 'จังหวะการพูด', accent: 'สำเนียง',
+      emotion: 'อารมณ์', referenceHint: 'เสียงคล้าย',
+      prompt: 'พรอมต์เสียง · ส่งข้อความนี้ให้ระบบ TTS',
+    },
+    importance: { protagonist: 'ตัวเอก', major: 'ตัวละครหลัก', supporting: 'ตัวละครสมทบ', minor: 'ตัวประกอบ' },
+    graphTitle: 'แผนผังความสัมพันธ์',
+    graphHint: 'วางเมาส์เพื่อดูความสัมพันธ์ คลิกเพื่อเปิดตัวละคร',
+    graphCounts: (n, e) => `${n} ตัวละคร · ${e} ความสัมพันธ์`,
+    exportJson: 'ส่งออก JSON',
+    graphLabels: 'ข้อความความสัมพันธ์',
+    graphEmpty: 'ไม่พบความสัมพันธ์ระหว่างตัวละครชุดนี้',
+    graphDangling: (n) => `มีอีก ${n} ความสัมพันธ์ที่ชี้ไปยังตัวละครซึ่งยังไม่มีประวัติ จึงไม่แสดงในแผนผัง`,
+    relationsAll: 'ความสัมพันธ์ทั้งหมด',
+    copy: 'คัดลอก', copied: 'คัดลอกแล้ว', copyFailed: 'คัดลอกไม่สำเร็จ', copyJson: 'คัดลอก JSON ของตัวละคร',
+    sheetCaption: 'ซ้าย: ครึ่งตัว　ขวา: เต็มตัวสามมุม',
+    noImage: 'ยังไม่มีภาพ',
+    noImageHint: 'สร้างด้วยพรอมต์ด้านล่าง',
+    colophonA: 'ประวัติและพรอมต์สร้างโดยโมเดลจากต้นฉบับ ',
+    colophonB: 'หมายถึงข้อมูลที่ต้นฉบับไม่ได้ระบุและเติมเพื่อให้ใช้งานได้',
+    mdTitle: (s) => `# ${s} — รายชื่อตัวละคร`,
+    mdCast: (n, names) => `${n} ตัวละคร: ${names}`,
+    mdSynopsis: '## เรื่องย่อ',
+    searchPlaceholder: 'ค้นหาตัวละคร ลักษณะ หรือบทบาท',
+    rosterTitle: 'ตัวละคร · เรียงตามบทบาทในเรื่อง',
+    footnote: 'รายการที่ระบุว่า (อนุมาน) ไม่ได้เขียนไว้ตรง ๆ ในต้นฉบับ แต่สรุปจากเนื้อหา',
+    noMatch: 'ไม่พบตัวละครที่ตรงกัน',
+    voiceTag: 'เสียง',
+    expandAll: 'ขยายทั้งหมด',
+    zoomImage: 'ดูภาพขนาดใหญ่',
+    copyImage: 'คัดลอกภาพ',
+    closeImage: 'ปิด',
   },
   ja: {
     kicker: 'キャラクター設定集',
@@ -455,6 +507,7 @@ export function seedFromOutline(outline) {
   return {
     source: outline?.source ?? '',
     lang: outline?.lang ?? DEFAULT_LANG,
+    contentLang: outline?.contentLang ?? DEFAULT_CONTENT_LANG,
     summary: '',
     characters,
   };
@@ -469,6 +522,17 @@ const IMPORTANCE = ['protagonist', 'major', 'supporting', 'minor'];
 const CJK = /[㐀-鿿぀-ヿ가-힯]/;
 /** 假名单独一条：用来把日文和中文区分开。 */
 const KANA = /[぀-ヿ]/;
+/** อักษรไทย รวมสระและวรรณยุกต์ */
+const THAI = /[฀-๿]/;
+/** อักษรไทยที่เป็นฐานเสียง ใช้ตรวจว่าข้อความเป็นภาษาไทยจริง ไม่ใช่มีแต่วรรณยุกต์ */
+const THAI_BASE = /[ก-ฮะาำเ-ๅ]/;
+const THAI_COMBINING = /[ัิ-ฺ็-๎]/g;
+
+/** ความยาวภาษาไทยไม่นับสระ/วรรณยุกต์แบบ combining; ภาษาอื่นนับ code point */
+export const contentLength = (value, contentLang = DEFAULT_CONTENT_LANG) => {
+  const text = String(value ?? '').normalize('NFC');
+  return [...(contentLang === 'th' ? text.replace(THAI_COMBINING, '') : text)].length;
+};
 
 const PERSONA_STRINGS = ['gender', 'ageRange', 'identity', 'appearance', 'temperament', 'motivation', 'arc'];
 /** 机器输入，永远英文——图像和 TTS 引擎都吃英文最稳，跟报告语言无关。 */
@@ -481,9 +545,9 @@ const normalise = (s) => String(s).replace(/\s+/g, '');
 /**
  * @param characters 角色卡数组
  * @param sourceText 原文；null 则跳过逐字引文校验
- * @param lang       报告语言，决定人类可读字段该是什么语言
+ * @param contentLang 内容语言，决定人类可读字段该是什么语言
  */
-export function validateCast(characters, sourceText, lang = DEFAULT_LANG) {
+export function validateCast(characters, sourceText, contentLang = DEFAULT_CONTENT_LANG) {
   const problems = [];
   const flatSource = sourceText === null ? null : normalise(sourceText);
   const at = (name, msg) => problems.push(`[${name}] ${msg}`);
@@ -631,14 +695,14 @@ export function validateCast(characters, sourceText, lang = DEFAULT_LANG) {
       const obj = c?.[group];
       if (!obj) continue;
       for (const f of fields) {
-        if (typeof obj[f] === 'string' && CJK.test(obj[f])) {
-          at(name, `${group}.${f} 是喂给模型的，必须英文，但含中日韩字符`);
+        if (typeof obj[f] === 'string' && (CJK.test(obj[f]) || THAI.test(obj[f]))) {
+          at(name, `${group}.${f} 是喂给模型的，必须英文，但含中日韩或泰文字符`);
         }
       }
     }
     if (Array.isArray(image?.tags)) {
       for (const t of image.tags) {
-        if (typeof t === 'string' && CJK.test(t)) at(name, `image.tags 必须英文，但「${t}」含中日韩字符`);
+        if (typeof t === 'string' && (CJK.test(t) || THAI.test(t))) at(name, `image.tags 必须英文，但「${t}」含中日韩或泰文字符`);
       }
     }
     // 只有这三种能可靠自动判别，其他语言不猜、跳过——误报比漏报更烦人。
@@ -646,12 +710,14 @@ export function validateCast(characters, sourceText, lang = DEFAULT_LANG) {
       for (const f of HUMAN_VOICE_FIELDS) {
         const v = voice[f];
         if (typeof v !== 'string' || !v.trim()) continue;
-        if (lang === 'en' && CJK.test(v)) at(name, `voice.${f} 应为英文，但含中日韩字符`);
-        if (lang === 'zh' && !CJK.test(v)) at(name, `voice.${f} 应为中文，实际是「${v}」`);
-        if (lang === 'zh' && KANA.test(v)) at(name, `voice.${f} 应为中文，但含日文假名`);
-        if (lang === 'ja' && !KANA.test(v) && !CJK.test(v)) {
+        if (contentLang === 'en' && (CJK.test(v) || THAI.test(v))) at(name, `voice.${f} 应为英文，但含中日韩或泰文字符`);
+        if (contentLang === 'zh' && !CJK.test(v)) at(name, `voice.${f} 应为中文，实际是「${v}」`);
+        if (contentLang === 'zh' && (KANA.test(v) || THAI.test(v))) at(name, `voice.${f} 应为中文，但含日文假名或泰文`);
+        if (contentLang === 'ja' && !KANA.test(v) && !CJK.test(v)) {
           at(name, `voice.${f} 应为日文，实际是「${v}」`);
         }
+        if (contentLang === 'th' && !THAI_BASE.test(v)) at(name, `voice.${f} ควรเป็นภาษาไทย แต่ได้รับ「${v}」`);
+        if (contentLang === 'th' && CJK.test(v)) at(name, `voice.${f} ควรเป็นภาษาไทย แต่มีอักษรจีน ญี่ปุ่น หรือเกาหลี`);
       }
     }
   }
@@ -671,7 +737,7 @@ export function validateCast(characters, sourceText, lang = DEFAULT_LANG) {
  * 顺序）。不给 order 就保持传入顺序——CLI 按文件名读卡，那是 slug
  * 字典序不是戏份序，所以报告要「按戏份排序」就必须给 order。
  */
-export function assembleCast(cards, { source, lang = DEFAULT_LANG, summary = '', ui = null, order = null } = {}) {
+export function assembleCast(cards, { source, lang = DEFAULT_LANG, contentLang = DEFAULT_CONTENT_LANG, summary = '', ui = null, order = null } = {}) {
   const rank = (c) => {
     const i = IMPORTANCE.indexOf(c?.importance);
     return i < 0 ? IMPORTANCE.length : i; // 越界的排最后，让 validate 去报，这里不崩
@@ -683,7 +749,7 @@ export function assembleCast(cards, { source, lang = DEFAULT_LANG, summary = '',
     .map((card, i) => [card, i])
     .sort((a, b) => rank(a[0]) - rank(b[0]) || byOrder(a[0]) - byOrder(b[0]) || a[1] - b[1])
     .map(([card]) => card);
-  const cast = { source, lang };
+  const cast = { source, lang, contentLang };
   if (ui) cast.ui = ui;
   cast.summary = summary;
   cast.characters = characters;
@@ -1062,8 +1128,8 @@ function renderGraph(ordered, t) {
  * `<` 转成 <：JSON 里 `<` 只可能出现在字符串值中，整体替换是安全的，
  * 而不转的话正文里一个 `</script` 就能把这个数据块提前截断。
  */
-function embedCast(characters, source, summary, lang, ui) {
-  const data = { source, lang, summary, ...(ui ? { ui } : {}), characters };
+function embedCast(characters, source, summary, lang, ui, contentLang = DEFAULT_CONTENT_LANG) {
+  const data = { source, lang, contentLang, summary, ...(ui ? { ui } : {}), characters };
   return JSON.stringify(data).replace(/</g, '\\u003c');
 }
 
@@ -1073,6 +1139,7 @@ export function renderHtml(
   summary = '',
   lang = DEFAULT_LANG,
   ui = null,
+  contentLang = DEFAULT_CONTENT_LANG,
 ) {
   const t = strings(lang, ui);
   const shots = characters.filter((c) => c.sheetImage).length;
@@ -1387,7 +1454,7 @@ button{font-family:inherit}
   <img alt="">
 </div>
 
-<script type="application/json" id="cast-data">${embedCast(characters, source, summary, lang, ui)}</script>
+<script type="application/json" id="cast-data">${embedCast(characters, source, summary, lang, ui, contentLang)}</script>
 
 <script>
 const L = ${JSON.stringify({ copied: t.copied, failed: t.copyFailed })};
@@ -1601,7 +1668,8 @@ const USAGE = `novel-characters.mjs — novel-characters skill 的确定性工�
   merge <workdir>                  归并 roster-*.json，打印 {characters, mergeCandidates}
         [--apply merges.json]      落地复核后的合并决定：{"merges":[{"keep":…,"absorb":[…]}]}
   assemble <workdir> --source <书名>
-        [--lang] [--out]           把 card-*.json + 故事摘要（+ 界面翻译）合成 cast.json
+        [--lang] [--content-lang] [--out]
+                                   把 card-*.json + 故事摘要（+ 界面翻译）合成 cast.json
         [--summary <file>]         故事摘要文件（默认 <workdir>/summary.txt）
         [--ui <file>]              界面文案翻译（默认 <workdir>/ui.json，内置语言不需要）
         [--order merged.json]      同档角色的戏份顺序（默认自动找 <workdir>/merged.json）
@@ -1613,6 +1681,7 @@ const USAGE = `novel-characters.mjs — novel-characters skill 的确定性工�
 通用选项：
   --lang <code>     报告语言，默认取 cast.json 的 lang，再默认 ${DEFAULT_LANG}
                     内置界面文案：${SUPPORTED_UI_LANGS.join(' / ')}；其他语言码用英文界面骨架
+  --content-lang <code>  角色内容语言，默认取 cast.json 的 contentLang，再默认 ${DEFAULT_CONTENT_LANG}
 
 render 选项：
   --source <name>   报告标题用的书名（默认取 cast.json 的 source 或文件名）
@@ -1629,7 +1698,7 @@ function flag(rest, name, fallback = null) {
   return i >= 0 && rest[i + 1] ? rest[i + 1] : fallback;
 }
 
-/** cast.json 可以是 {source, lang, summary, characters}，也可以是裸数组（旧格式）。 */
+/** cast.json 可以是 {source, lang, contentLang, summary, characters}，也可以是裸数组（旧格式）。 */
 function loadCast(path) {
   const raw = readJson(path);
   const characters = Array.isArray(raw) ? raw : raw.characters;
@@ -1639,6 +1708,7 @@ function loadCast(path) {
     source: Array.isArray(raw) ? null : raw.source,
     summary: Array.isArray(raw) ? '' : (raw.summary ?? ''),
     lang: Array.isArray(raw) ? DEFAULT_LANG : (raw.lang ?? DEFAULT_LANG),
+    contentLang: Array.isArray(raw) ? DEFAULT_CONTENT_LANG : (raw.contentLang ?? DEFAULT_CONTENT_LANG),
     ui: Array.isArray(raw) ? null : (raw.ui ?? null),
   };
 }
@@ -1709,6 +1779,7 @@ function main(argv) {
     const sourceName = flag(rest, '--source');
     if (!sourceName) throw new Error('assemble 需要 --source <书名>');
     const lang = flag(rest, '--lang', DEFAULT_LANG);
+    const contentLang = flag(rest, '--content-lang', DEFAULT_CONTENT_LANG);
 
     const files = readdirSync(dir).filter((f) => /^card-.*\.json$/.test(f)).sort();
     if (!files.length) throw new Error(`${dir} 里没有 card-*.json`);
@@ -1766,7 +1837,7 @@ function main(argv) {
       process.exit(1);
     }
 
-    const cast = assembleCast(cards, { source: sourceName, lang, summary, ui, order });
+    const cast = assembleCast(cards, { source: sourceName, lang, contentLang, summary, ui, order });
     const json = JSON.stringify(cast, null, 2) + '\n';
     const out = flag(rest, '--out');
     if (out) {
@@ -1781,11 +1852,12 @@ function main(argv) {
   if (cmd === 'validate') {
     const [castPath, bookPath] = rest;
     if (!castPath) throw new Error('用法：validate <cast.json> <book.txt>');
-    const { characters, summary, lang: castLang, ui } = loadCast(castPath);
+    const { characters, summary, lang: castLang, contentLang: castContentLang, ui } = loadCast(castPath);
     const lang = flag(rest, '--lang', castLang);
+    const contentLang = flag(rest, '--content-lang', castContentLang);
     const source = bookPath ? readFileSync(resolve(bookPath), 'utf8') : null;
     if (!bookPath) console.error('⚠️ 没给原文，跳过逐字引文校验');
-    const problems = validateCast(characters, source, lang);
+    const problems = validateCast(characters, source, contentLang);
     // 顶层的故事摘要——报告要用，缺了就没法在顶部交代背景
     if (typeof summary !== 'string' || !summary.trim()) {
       problems.unshift('顶层缺少 summary（故事摘要），报告顶部会空着');
@@ -1803,7 +1875,7 @@ function main(argv) {
       for (const p of problems) console.error('  ' + p);
       process.exit(1);
     }
-    console.log(`✓ ${characters.length} 个角色全部通过校验（lang=${lang}）`);
+    console.log(`✓ ${characters.length} 个角色全部通过校验（lang=${lang}, contentLang=${contentLang}）`);
     return;
   }
 
@@ -1814,7 +1886,7 @@ function main(argv) {
     const imagesFlag = flag(rest, '--images');
     const sourceFlag = flag(rest, '--source');
 
-    const { characters, source, summary, lang: castLang, ui } = loadCast(castPath);
+    const { characters, source, summary, lang: castLang, contentLang, ui } = loadCast(castPath);
     const lang = flag(rest, '--lang', castLang);
     const title = sourceFlag ?? source ?? basename(castPath).replace(/\.[^.]+$/, '');
 
@@ -1830,7 +1902,7 @@ function main(argv) {
 
     process.stdout.write(
       (html
-        ? renderHtml(characters, title, summary, lang, ui)
+        ? renderHtml(characters, title, summary, lang, ui, contentLang)
         : renderMarkdown(characters, title, summary, lang, ui)) + '\n',
     );
     return;

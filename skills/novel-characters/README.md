@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-8b1a1a?style=for-the-badge)](README.md)
 [![English](https://img.shields.io/badge/English-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![关注作者 X](https://img.shields.io/badge/%E5%85%B3%E6%B3%A8%E4%BD%9C%E8%80%85-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-characters
@@ -22,7 +23,7 @@
 /novel-characters ./book.txt --lang ja
 ```
 
-内置 **中文 / English / 日本語** 三套界面文案。**其他语言一样支持**——skill 会现场把界面文案翻译成目标语言，存进 `cast.json` 的 `ui` 字段，渲染时合并进去。所以法语、韩语、西班牙语都能出完整报告，不会露出英文界面。
+内置 **中文 / ไทย / English / 日本語** 四套界面文案。界面语言使用 `lang`，角色内容语言使用 `contentLang`；其他界面语言仍可通过 `ui` 自定义翻译。
 
 想自己准备翻译：
 
@@ -99,7 +100,7 @@ node scripts/novel-characters.mjs seed outline.json > seed.json
 顶栏的「导出 JSON」下载的**就是 `cast.json` 本身的形状**，不是另一套导出格式：
 
 ```json
-{ "source": "…", "lang": "zh", "summary": "…", "characters": [ … ] }
+{ "source": "…", "lang": "zh", "contentLang": "zh", "summary": "…", "characters": [ … ] }
 ```
 
 所以外部工具改完可以**直接喂回 `render` 重新出报告**，也能过 `validate`。角色卡里的 `sheetImage` 一并带出，拿得到哪张图对应哪个人——图由下游出，`render --images <目录>` 指到图所在的目录就会捡起来（不给就找 cast.json 同级的 `images/`）。
@@ -126,7 +127,7 @@ node scripts/novel-characters.mjs seed outline.json > seed.json
 | --- | --- |
 | `evidence` 必须是原文**逐字连续**片段 | 防编造。被「他说」断开的对白不许拼接 |
 | 出图 prompt **不许出现人名** | 图像模型对人名偏见极重，会画成它记忆里的角色 |
-| 字段**语言分工** | 人类字段跟随 `--lang`、出图和 TTS 提示词永远英文，模型会漂 |
+| 字段**语言分工** | 人类字段跟随 `contentLang`、界面跟随 `lang`，出图和 TTS 提示词永远英文 |
 | 结构 + 枚举 | `importance` 只能是那四个值 |
 
 这三条不是拍脑袋定的——是模型输出真的违反过、被校验脚本当场抓住才立起来的。
@@ -140,7 +141,7 @@ node scripts/novel-characters.mjs seed outline.json              # 有大纲就�
 node scripts/novel-characters.mjs chunk book.txt /tmp/wk        # 切块
 node scripts/novel-characters.mjs merge /tmp/wk                 # 归并 roster-*.json，附疑似同人候选
 node scripts/novel-characters.mjs merge /tmp/wk --apply m.json   # 落地复核后的合并
-node scripts/novel-characters.mjs assemble /tmp/wk --source 书名 # card-*.json 合成 cast.json，同档按戏份排序
+node scripts/novel-characters.mjs assemble /tmp/wk --source 书名 --lang th --content-lang th
 node scripts/novel-characters.mjs validate cast.json book.txt   # 校验
 node scripts/novel-characters.mjs render cast.json --html       # 出 report.html
 node scripts/novel-characters.mjs slug "胡二爷"                  # 安全文件名
@@ -149,7 +150,7 @@ node scripts/novel-characters.mjs slug "胡二爷"                  # 安全文�
 ## 边界
 
 - 单次上限 24 块（净覆盖约 93 万字符）。超了会明确报 `truncated`，**不静默截断**
-- 人类可读字段跟随 `--lang`；出图和 TTS 提示词**永远英文**，那些引擎吃英文最稳，跟报告语言无关
+- 人类可读字段跟随 `contentLang`，界面跟随 `lang`；泰文长度测量忽略组合元音与声调符号。出图和 TTS 提示词**永远英文**。
 - 默认取戏份最重的 30 位角色，每位一份完整角色卡。想少要就直接给个数，或者说只要主要角色
 - **画风不进提示词**：它是出图那一刻由下游整批附加在提示词前面的一层。早期把画风写死进每条提示词能压住一部分漂移，代价是换风格要逐条改，而且跟当时选的那一档正面打架。同一批角色的一致性因此也归下游管，见 `references/sheet.md`
 

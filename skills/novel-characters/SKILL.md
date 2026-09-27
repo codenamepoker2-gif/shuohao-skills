@@ -180,7 +180,7 @@ node {baseDir}/scripts/novel-characters.mjs assemble <workdir> \
 node {baseDir}/scripts/novel-characters.mjs validate <cast.json> <book.txt>
 ```
 
-记得带上 `--lang`（Step 0 定的）。检查：结构、`importance` 枚举、**引文逐字**、**出图提示词不含人名**、**语言分工**（人类字段跟随 `lang`、出图/TTS 提示词永远英文）、以及**非内置语言必须带 `ui`**。
+记得带上 `--lang`（Step 0 定的）。检查：结构、`importance` 枚举、**引文逐字**、**出图提示词不含人名**、**语言分工**（人类字段跟随 `contentLang`，默认 `zh`，泰文与英文有自己的校验规则；界面标签跟随 `lang`；出图/TTS 提示词永远英文）、以及**非内置语言必须带 `ui`**。
 
 **有违规就按报错逐条修，改完重跑，直到通过。** 这四类错模型真的会犯——这套检查就是被真实输出打出来的。
 

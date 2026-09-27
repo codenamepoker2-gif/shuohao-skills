@@ -1,0 +1,45 @@
+{
+  "source": "สะพาน",
+  "lang": "th",
+  "contentLang": "th",
+  "summary": "เช้าตรู่ริมแม่น้ำ อรุณมารอใครบางคนที่สะพานไม้เก่า เขาพกสมุดวาดเขียนและเฝ้ามองเรือผ่านหมอกอย่างเงียบงัน",
+  "characters": [
+    {
+      "name": "อรุณ",
+      "aliases": [],
+      "importance": "protagonist",
+      "oneLiner": "นักวาดหนุ่มผู้มารอที่สะพานพร้อมสมุดเล่มเก่าและความหวังที่ยังไม่ยอมเอ่ย",
+      "persona": {
+        "gender": "ชาย",
+        "ageRange": "ยี่สิบห้าปี",
+        "identity": "นักวาดภาพอิสระที่เดินทางกลับบ้านริมแม่น้ำ",
+        "appearance": "รูปร่างผอมสูง ผมดำสั้นยุ่งเล็กน้อย สวมเสื้อเชิ้ตผ้าฝ้ายสีขาวกับกางเกงสีกรมท่า และกอดสมุดวาดเขียนปกเก่าไว้แน่น",
+        "personality": ["ช่างสังเกต", "สุภาพ", "เก็บความรู้สึก"],
+        "temperament": "พูดช้าและเว้นช่วงก่อนตอบ มักมองสายน้ำแทนการสบตาเมื่อรู้สึกไม่มั่นใจ",
+        "motivation": "ต้องการพบคนที่นัดไว้และตัดสินใจว่าจะกลับมาอยู่บ้านเกิดหรือไม่",
+        "arc": "เริ่มจากการเฝ้ารออย่างลังเล ก่อนยอมรับว่าคำตอบขึ้นอยู่กับการตัดสินใจของตนเอง",
+        "relationships": [],
+        "evidence": [
+          "อรุณยืนรออยู่ที่สะพานไม้เก่า",
+          "เขากอดสมุดวาดเขียนไว้แน่นและมองเรือหางยาวแล่นผ่านหมอกบาง ๆ"
+        ]
+      },
+      "image": {
+        "prompt": "A slender twenty-five-year-old Thai man with short slightly tousled black hair, wearing a white cotton shirt and dark navy trousers, holding a weathered sketchbook against his chest, observant dark eyes, reserved expression, full body, plain neutral background",
+        "promptLocal": "ชายไทยรูปร่างผอมสูงอายุยี่สิบห้าปี ผมดำสั้นยุ่งเล็กน้อย สวมเสื้อเชิ้ตผ้าฝ้ายสีขาวกับกางเกงสีกรมท่า กอดสมุดวาดเขียนปกเก่าไว้ที่อก ดวงตาช่างสังเกตและสีหน้าสงวนท่าที",
+        "negativePrompt": "text, watermark, extra fingers, malformed hands, busy background",
+        "tags": ["character sheet", "riverside morning", "cotton clothing"],
+        "sheet": "Single character model sheet on one 16:9 landscape canvas. Left zone: one front-facing bust portrait. Right-top zone: front, side and back full-body views of the same person with identical proportions and clothing. Right-bottom zone: close-up studies of the shirt collar, sketchbook cover and worn sandals. Plain pure white background, no text, no watermark."
+      },
+      "voice": {
+        "timbre": "เสียงทุ้มอ่อนและโปร่ง มีลมหายใจเล็กน้อย",
+        "pitch": "ระดับเสียงกลางค่อนไปทางต่ำ",
+        "pace": "พูดช้าและเว้นจังหวะก่อนประโยคสำคัญ",
+        "accent": "สำเนียงไทยภาคกลางชัดเจน",
+        "emotion": "สงบแต่ซ่อนความลังเล",
+        "prompt": "25-year-old Thai male, gentle airy baritone, mid-low pitch, soft volume, slow pace with thoughtful pauses. Clear Central Thai accent. Calm and reserved with quiet uncertainty.",
+        "referenceHint": "คล้ายนักจัดรายการวิทยุยามเช้าที่พูดอย่างระมัดระวัง"
+      }
+    }
+  ]
+}
