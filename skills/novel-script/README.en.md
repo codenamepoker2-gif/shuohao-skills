@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-script
@@ -38,7 +39,7 @@ The selftest **defeats every gate on purpose** to prove each one actually blocks
 
 ## The report
 
-**Reports render with a Chinese UI by default; pass `--lang en` for a fully English report** (or set a top-level `"lang": "en"` in script.json — `--lang` wins when both are given). In English mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored.
+**Reports ship with Chinese, Thai, and English UI.** Chinese is the default; pass `--lang th` or `--lang en`, or set a top-level `lang` in script.json (`--lang` wins when both are given). In every language mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored. Content language is set separately with `contentLang: "zh" | "th" | "en"`: Thai dialogue is timed at 13 base characters/second (combining vowel and tone marks ignored), Chinese keeps 4.5 chars/second.
 
 A single-page, 1600px-wide review document:
 
@@ -71,6 +72,7 @@ node scripts/novel-script.mjs validate script.json --outline outline.json --art 
 node scripts/novel-script.mjs checkup script.json
 node scripts/novel-script.mjs render script.json --html --outline outline.json --art art.json --cast cast.json > script-report.html
 node scripts/novel-script.mjs render script.json --html --lang en --outline outline.json --art art.json > script-report.html
+node scripts/novel-script.mjs render script.json --html --lang th --outline outline.json --art art.json > script-report.html
 ```
 
 The report UI defaults to Chinese; `--lang en` renders it fully in English.
@@ -79,7 +81,7 @@ The report UI defaults to Chinese; `--lang en` renders it fully in English.
 
 - No shots, no shot numbers, no generation prompts, no images — nothing from the storyboard layer
 - Duration is an **estimate, not a stopwatch** — that's what the ±15% tolerance is for; tune `params.charsPerSecond` to your voice-over pace
-- Report UI ships in Chinese and English (`--lang zh|en`, Chinese by default, or the script.json top-level `lang` field); dialogue follows the drama's language
+- Report UI ships in Chinese (default), Thai, and English — pick with `--lang`, or the script.json top-level `lang` field; content language is set separately with `contentLang` (`zh` / `th` / `en`, default `zh`), and Thai dialogue is timed at 13 base characters/second ignoring combining marks; dialogue follows the drama's language
 - Write ≤ 3 episodes per batch — the script is the most-rewritten layer of the whole pipeline
 
 ## Selftest
@@ -88,7 +90,7 @@ The report UI defaults to Chinese; `--lang en` renders it fully in English.
 node scripts/selftest.mjs
 ```
 
-154 assertions — timing engine, stats, gate-defeating cases, seed, rendering (both UI languages), export. No model calls, runs in about a second.
+175 assertions — timing engine, stats, gate-defeating cases, seed, Thai content timing, rendering (all three UI languages), export. No model calls, runs in about a second.
 
 The bundled example (`examples/渡口-script.json`) is a **complete 6-episode script** — 9 scenes, 123 lines, every episode inside the ±15% band, all gates passing against the outline and art fixtures.
 

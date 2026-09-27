@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_PARAMS,
+  THAI_CHARS_PER_SECOND,
   computeStats,
   gateReport,
   lineChars,
@@ -46,6 +47,9 @@ eq(lineChars('你好，世界。'), 6, '标点算时间——停顿也是时间'
 eq(lineChars('  你 好  '), 2, '空白不算字符');
 eq(lineChars(''), 0, '空串为零');
 eq(lineChars(null), 0, 'null 不崩');
+eq(lineChars('𠀀'), 2, '中文默认继续按 UTF-16 长度计数，保持上游行为');
+eq(lineChars('สวัสดีค่ะ', 'th'), 6, '泰文计数忽略组合元音与声调符号');
+eq(lineChars('ก้า', 'th'), lineChars('กา', 'th'), '泰文声调符号不增加长度');
 
 const sc = {
   flow: [
@@ -64,6 +68,8 @@ eq(paramsOf({}).charsPerSecond, DEFAULT_PARAMS.charsPerSecond, '默认参数生�
 eq(paramsOf({ params: { charsPerSecond: 6 } }).charsPerSecond, 6, 'params 可覆盖语速');
 eq(paramsOf({ params: { charsPerSecond: 6 } }).tolerance, DEFAULT_PARAMS.tolerance, '只覆盖给出的键');
 eq(sceneSeconds(sc, { ...DEFAULT_PARAMS, charsPerSecond: 9 }).dialogue, 1, '语速参数参与计算');
+eq(paramsOf({ contentLang: 'th' }).charsPerSecond, THAI_CHARS_PER_SECOND, '泰文默认语速使用命名常量');
+eq(paramsOf({ contentLang: 'th', params: { charsPerSecond: 9 } }).charsPerSecond, 9, '泰文语速仍可显式覆盖');
 
 /* ---------------- computeStats ---------------- */
 
@@ -185,6 +191,12 @@ eq(gateReport(FIXTURE).length, 10, '十道门');
   doc.episodes[0].scenes[0].flow.push({ action: '老周说「坐稳了」，随即撑篙。' });
   ok(!gate(doc, 'action-prose').ok, '动作里混台词引号被拦');
 }
+{
+  const doc = clone(FIXTURE);
+  doc.contentLang = 'th';
+  doc.episodes[0].scenes[0].flow.push({ action: 'เขาพูดว่า "ไปกันเถอะ" แล้วลุกขึ้น' });
+  ok(!gate(doc, 'action-prose').ok, '泰文动作里的 ASCII 引号台词被语言感知门拦住');
+}
 // beats-claimed
 {
   const doc = clone(FIXTURE);
@@ -277,6 +289,26 @@ ok(validateScript({ source: 'x', episodes: [] }).some((p) => p.includes('episode
   ok(validateScript(doc).some((p) => p.includes('空动作')), '空动作节拍报出来');
 }
 ok(validateScript(clone(FIXTURE)).length === 0, '不带上游校验也通过');
+{
+  const thai = {
+    source: 'เรือข้ามฟาก', contentLang: 'th',
+    episodes: [{
+      ep: 1, targetSeconds: 3, hook: 'ได้ยินเสียงเรียกจากอีกฝั่ง', cliff: 'เรือว่างเปล่า',
+      hookBeat: [1, 1], beatsClaimed: [],
+      scenes: [{ sceneId: 'S01', characters: ['C01'], flow: [
+        { action: 'หญิงสาวหันไปมองอีกฝั่ง' },
+        { speaker: 'C01', line: 'สวัสดีค่ะ', delivery: 'พูดเบา ๆ' },
+      ] }],
+    }],
+  };
+  eq(validateScript(thai).length, 0, '泰文剧本从结构校验到十道质量门完整通过');
+  eq(computeStats(thai).episodes[0].dialogueSeconds, 0.5, '泰文台词按 13 个基础字符每秒估时');
+}
+{
+  const doc = clone(FIXTURE);
+  doc.contentLang = 'xx';
+  ok(validateScript(doc).some((p) => p.includes('contentLang')), '未知内容语言被结构校验拦住');
+}
 
 /* ---------------- seed ---------------- */
 
@@ -290,6 +322,14 @@ eq(seeded.episodes[0].beatsClaimed.join(','), '悬念钩', '第 1 集预填悬�
 eq(seeded.episodes[2].beatsClaimed.join(','), '身份揭破', '第 3 集预填身份揭破');
 eq(seeded.episodes[1].beatsClaimed.length, 0, '没有爽点的集为空数组');
 eq(seeded.episodes[0].scenes.length, 0, 'scenes 留空给模型写戏');
+eq(seeded.contentLang, 'zh', 'seed 默认继承中文内容语言');
+{
+  const outline = clone(OUTLINE);
+  outline.contentLang = 'th';
+  eq(seedFromOutline(outline).contentLang, 'th', 'seed 从大纲继承泰文内容语言');
+  outline.lang = 'th';
+  eq(seedFromOutline(outline).lang, 'th', 'seed 同时继承报告界面语言');
+}
 ok(seeded.episodes[0].seedNote.includes('S01'), 'seedNote 带候选场景');
 ok(seeded.episodes[0].seedNote.includes(OUTLINE.episodes[0].synopsis.slice(0, 10)), 'seedNote 带梗概');
 eq(seedFromOutline(OUTLINE, [3, 5]).episodes.map((e) => e.ep).join(','), '3,4,5', '--eps 区间过滤');
@@ -376,6 +416,24 @@ ok(html.includes('lang="zh"'), '默认报告 html lang 是 zh');
   ok(!en.includes('导出 JSON'), 'en 报告不含中文导出标签');
   ok(!en.includes('质量门'), 'en 报告不含中文质量门标签');
   ok(!en.includes('台词本'), 'en 报告不含中文台词本标签');
+}
+
+/* ---------------- render — 泰文界面 ---------------- */
+
+{
+  const th = renderHtml(FIXTURE, { ...CTX, lang: 'th' });
+  ok(th.includes('lang="th"'), 'th 报告的 html lang 属性正确');
+  ok(th.includes('ส่งออก JSON'), 'th 导出按钮使用自然泰文');
+  ok(th.includes('เกณฑ์คุณภาพ 10 / 10'), 'th 页眉质量门徽章全绿');
+  ok(th.includes('สมุดบทพูด'), 'th 台词本标题');
+  ok(th.includes('มาตรวัดเวลา'), 'th 时长仪表标题');
+  ok(th.includes('ความยาวแต่ละตอนอยู่ในช่วง'), 'th 质量门标签已翻译');
+  ok(!th.includes('导出 JSON') && !th.includes('Quality gates'), 'th 报告不残留中英文界面标签');
+}
+{
+  const mdTh = renderMarkdown(FIXTURE, { ...CTX, lang: 'th' });
+  ok(mdTh.includes('## ตอนที่ 1'), 'th md 分集标题是泰文');
+  ok(mdTh.includes('## สมุดบทพูด'), 'th md 台词本标题是泰文');
 }
 {
   const mdEn = renderMarkdown(FIXTURE, { ...CTX, lang: 'en' });

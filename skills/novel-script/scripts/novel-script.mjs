@@ -27,12 +27,31 @@ export const DEFAULT_PARAMS = {
   hookWindow: 3,       // 开场钩子必须在全集前几拍内兑现——短剧开场 3 秒定生死
 };
 
+// Starting measurement for Thai dialogue, to be calibrated against the studio's
+// actual voices. Thai combining vowels and tone marks do not count as characters.
+export const THAI_CHARS_PER_SECOND = 13;
+export const CONTENT_LANGS = ['zh', 'th', 'en'];
+export const contentLangOf = (doc) => doc?.contentLang ?? 'zh';
+
 export function paramsOf(doc) {
-  return { ...DEFAULT_PARAMS, ...(doc?.params ?? {}) };
+  const contentLang = contentLangOf(doc);
+  return {
+    ...DEFAULT_PARAMS,
+    ...(contentLang === 'th' && doc?.params?.charsPerSecond == null
+      ? { charsPerSecond: THAI_CHARS_PER_SECOND }
+      : {}),
+    ...(doc?.params ?? {}),
+    contentLang,
+  };
 }
 
-/** 台词计秒用的字符数：去空白，标点算时间（停顿也是时间）。 */
-export const lineChars = (line) => String(line ?? '').replace(/\s+/g, '').length;
+/** 台词计秒用的字符数：去空白，标点算时间；泰文不计组合元音与声调符号。 */
+export const lineChars = (line, contentLang = 'zh') => {
+  const raw = String(line ?? '').replace(/\s+/g, '');
+  if (contentLang !== 'th') return raw.length;
+  const compact = raw.normalize('NFC');
+  return Array.from(compact.replace(/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/g, '')).length;
+};
 
 const r1 = (n) => Math.round(n * 10) / 10;
 
@@ -41,7 +60,7 @@ export function sceneSeconds(scene, params = DEFAULT_PARAMS) {
   let dlg = 0;
   let act = 0;
   for (const b of scene?.flow ?? []) {
-    if (typeof b?.line === 'string') dlg += lineChars(b.line) / params.charsPerSecond;
+    if (typeof b?.line === 'string') dlg += lineChars(b.line, params.contentLang) / params.charsPerSecond;
     else if (typeof b?.action === 'string') act += params.actionSeconds;
   }
   return { dialogue: r1(dlg), action: r1(act), total: r1(dlg + act) };
@@ -74,7 +93,7 @@ export function computeStats(doc) {
         if (!byCharacter.has(key)) byCharacter.set(key, { lines: [], chars: 0 });
         const entry = byCharacter.get(key);
         entry.lines.push({ ep: ep.ep, sceneIndex: idx + 1, sceneId: sc.sceneId, line: b.line, delivery: b.delivery ?? '' });
-        entry.chars += lineChars(b.line);
+        entry.chars += lineChars(b.line, params.contentLang);
       }
       sceneTable.push({
         ep: ep.ep, index: idx + 1, sceneId: sc.sceneId, lighting: sc.lighting ?? '',
@@ -121,6 +140,8 @@ export function computeStats(doc) {
 const thText = (s) => typeof s === 'string' && s.trim();
 /** 动作描述必须是叙述体——台词只能进 dialogue 字段，混进 action 就没法计秒。 */
 const QUOTE_RE = /「|」|『|』|“|”/;
+const actionHasDialogueQuotes = (text, contentLang) =>
+  QUOTE_RE.test(text) || (contentLang !== 'zh' && /"/.test(text));
 
 export function gateReport(doc, ctx = {}) {
   const gates = [];
@@ -171,11 +192,11 @@ export function gateReport(doc, ctx = {}) {
       for (const b of sc?.flow ?? []) {
         if (typeof b?.action === 'string') {
           hasAction = true;
-          if (QUOTE_RE.test(b.action)) bad.prose.push(`${label} ${sc?.sceneId ?? '?'}`);
+          if (actionHasDialogueQuotes(b.action, params.contentLang)) bad.prose.push(`${label} ${sc?.sceneId ?? '?'}`);
         }
         if (typeof b?.line === 'string') {
-          if (lineChars(b.line) > params.maxLineChars) {
-            bad.lineLen.push(`${label}「${b.line.slice(0, 12)}…」${lineChars(b.line)} 字`);
+          if (lineChars(b.line, params.contentLang) > params.maxLineChars) {
+            bad.lineLen.push(`${label}「${b.line.slice(0, 12)}…」${lineChars(b.line, params.contentLang)} 字`);
           }
           if (b.speaker !== 'VO' && !cast.has(b.speaker)) {
             bad.speaker.push(`${label} ${sc?.sceneId ?? '?'} 的「${b.speaker}」不在本场人物里`);
@@ -251,6 +272,7 @@ export function validateScript(doc, ctx = {}) {
   if (!doc || typeof doc !== 'object') return ['script.json 不是对象'];
 
   if (!thText(doc.source)) p('缺少 source（剧名/书名）');
+  if (!CONTENT_LANGS.includes(contentLangOf(doc))) p(`contentLang 只支持 zh / th / en，实际是「${contentLangOf(doc)}」`);
   const eps = doc.episodes;
   if (!Array.isArray(eps) || eps.length === 0) {
     p('episodes 为空');
@@ -319,7 +341,12 @@ export function seedFromOutline(outline, epRange = null) {
       // 从大纲搬来的参考，写完删掉也行
       seedNote: `大纲梗概：${e.synopsis ?? ''}　候选场景：${(e.sceneIds ?? []).join('、')}　人物：${(e.characterIds ?? []).join('、')}`,
     }));
-  return { source: outline?.source ?? '', episodes };
+  return {
+    source: outline?.source ?? '',
+    contentLang: contentLangOf(outline),
+    ...(outline?.lang ? { lang: outline.lang } : {}),
+    episodes,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -338,7 +365,7 @@ export function slug(name) {
 /* render — 界面文案                                                    */
 /* ------------------------------------------------------------------ */
 /*
- * 内置 zh / en 两套，全部界面文案收在这张表里。
+ * 内置 zh / th / en 三套，全部界面文案收在这张表里。
  * 质量门的 label/detail 是 validate/checkup 的诊断文案，保持中文，不在此列。
  */
 
@@ -364,14 +391,37 @@ const GATE_SKIPS_EN = {
     '未提供 outline/cast，本门跳过（视为通过）': 'outline/cast not provided — gate skipped (treated as passing)',
     '未提供 cast.json，本门跳过（视为通过）': 'cast.json not provided — gate skipped (treated as passing)',
 };
+const GATE_LABELS_TH = {
+  'duration': 'ความยาวแต่ละตอนอยู่ในช่วง ±{0}% ของเป้าหมาย',
+  'line-length': 'บทพูดแต่ละประโยคยาวไม่เกิน {0} อักขระ',
+  'speaker': 'ผู้พูดอยู่ในฉาก หรือระบุชัดว่าเป็นเสียงบรรยาย VO',
+  'hook-cliff': 'ทุกตอนมีจุดดึงความสนใจตอนเปิดและจุดค้างท้ายตอน',
+  'hook-open': 'ภาพที่ทำให้จุดดึงความสนใจเป็นรูปธรรมเกิดภายใน {0} จังหวะแรก (ระบุด้วย hookBeat)',
+  'has-action': 'ทุกฉากมีจังหวะการกระทำอย่างน้อยหนึ่งจังหวะ',
+  'action-prose': 'คำบรรยายการกระทำเป็นร้อยแก้ว และบทพูดอยู่ในรายการบทพูดเท่านั้น',
+  'beats-claimed': 'รับช่วงจังหวะสำคัญจากโครงเรื่องครบตามตอน',
+  'refs-characters': 'ตัวละครตรงกับโครงเรื่อง',
+  'refs-scenes': 'ฉาก แสง และอุปกรณ์ประกอบฉากตรงกับคู่มืองานศิลป์',
+};
+const GATE_SKIPS_TH = {
+  '未提供 outline.json，本门跳过（视为通过）': 'ไม่ได้ระบุ outline.json — ข้ามเกณฑ์นี้และถือว่าผ่าน',
+  '未提供 art.json，本门跳过（视为通过）': 'ไม่ได้ระบุ art.json — ข้ามเกณฑ์นี้และถือว่าผ่าน',
+  '未提供 script.json，本门跳过（视为通过）': 'ไม่ได้ระบุ script.json — ข้ามเกณฑ์นี้และถือว่าผ่าน',
+  '未提供 outline/cast，本门跳过（视为通过）': 'ไม่ได้ระบุ outline/cast — ข้ามเกณฑ์นี้และถือว่าผ่าน',
+  '未提供 cast.json，本门跳过（视为通过）': 'ไม่ได้ระบุ cast.json — ข้ามเกณฑ์นี้และถือว่าผ่าน',
+};
 /** 报告里的门文案：英文界面取映射，未命中或中文界面回落原文。 */
 const gateText = (g, lang) => {
-  if (lang !== 'en') return { label: g.label, detail: g.detail };
-  const en = GATE_LABELS_EN[g.id];
+  if (lang === 'zh') return { label: g.label, detail: g.detail };
+  const translated = (lang === 'th' ? GATE_LABELS_TH : GATE_LABELS_EN)[g.id];
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
-  const label = en ? en.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
-  return { label, detail: GATE_SKIPS_EN[g.detail] ?? g.detail };
+  const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
+  const skips = lang === 'th' ? GATE_SKIPS_TH : GATE_SKIPS_EN;
+  const detail = skips[g.detail] ?? (g.detail ? (lang === 'th'
+    ? 'พบข้อมูลที่ไม่ผ่านเกณฑ์นี้ โปรดเรียก validate เพื่อดูตำแหน่งที่ต้องแก้'
+    : 'This gate has failing items; run validate for exact locations') : '');
+  return { label, detail };
 };
 
 const I18N = {
@@ -487,10 +537,66 @@ const I18N = {
     paren: (s) => ` (${s})`,
     colophon: 'Script written by the model against the outline and art bible; durations and references checked deterministically by script. Storyboarding and first-frame prompts belong to the next layer, not this report.',
   },
+  th: {
+    langCode: 'th',
+    kicker: 'บทภาพยนตร์',
+    docTitle: (s, a, b) => `${s} · บทภาพยนตร์${a === b ? ` (ตอนที่ ${a})` : ` (ตอนที่ ${a}–${b})`}`,
+    epHead: (n) => `ตอนที่ ${n}`,
+    epRange: (a, b) => (a === b ? `ตอนที่ ${a}` : `ตอนที่ ${a}–${b}`),
+    exportJson: 'ส่งออก JSON',
+    gates: 'เกณฑ์คุณภาพ',
+    gatesPass: 'ผ่านทั้งหมด',
+    gatesFail: (n) => `ไม่ผ่าน ${n} รายการ`,
+    gatePill: (okN, total) => `เกณฑ์คุณภาพ ${okN} / ${total}`,
+    kpi: {
+      eps: 'จำนวนตอน', epsSub: (sc) => `${sc} ฉาก`,
+      time: 'เวลารวมโดยประมาณ', timeSub: (t) => `เป้าหมาย ${t}`,
+      lines: 'บทพูด', linesSub: (sec) => `บทพูดประมาณ ${sec} วินาที`,
+      dlgRatio: 'สัดส่วนบทพูด', dlgRatioSub: 'ส่วนที่เหลือคือภาพและการกระทำ',
+      avgScene: 'เฉลี่ยต่อฉาก', avgSceneSub: 'จำนวนครั้งที่เปลี่ยนฉากเป็นสถิติ ไม่ใช่เกณฑ์',
+    },
+    secTiming: 'มาตรวัดเวลา',
+    secScript: 'บทภาพยนตร์แยกตามตอน',
+    secSceneTable: 'ตารางฉาก',
+    secCastLines: 'สมุดบทพูด',
+    secGates: 'เกณฑ์คุณภาพ',
+    timingNote: (tol) => `แถบสีเขียว = เป้าหมาย ±${tol}%; บทพูดคำนวณตามความเร็ว ส่วนการกระทำคำนวณตามจังหวะ`,
+    scriptNote: 'สองตอนต่อแถว · ฉากที่ยาวจะย่อไว้ กดเพื่อดูทั้งหมด',
+    sceneTableNote: 'สรุปอัตโนมัติ · โมเดลไม่ต้องเขียน',
+    castLinesNote: 'จัดกลุ่มตามตัวละคร · เลื่อนได้เมื่อเกิน 6 แถว · พร้อมใช้กับ TTS แบบชุด',
+    hookLabel: 'จุดดึงความสนใจตอนเปิด',
+    hookAt: (sc, b) => `เกิดในฉาก ${sc} จังหวะ ${b}`,
+    voiceBtn: 'พรอมป์เสียง',
+    cliffLabel: 'จุดค้างท้ายตอน',
+    beatsLabel: 'จังหวะสำคัญที่รับช่วง',
+    estLabel: (est, target) => `ประมาณ ${est} วินาที / เป้าหมาย ${target} วินาที`,
+    sceneHead: (i) => `ฉาก ${i}`,
+    voLabel: 'เสียงบรรยาย',
+    lightingLabel: 'แสง',
+    showScenes: '▾ แสดงฉากทั้งหมด',
+    hideScenes: '▴ ย่อฉาก',
+    sceneCols: ['ตอน', 'ฉาก', 'สถานที่', 'แสง', 'ตัวละคร', 'จำนวนบทพูด', 'เวลาประมาณ'],
+    castCols: ['ตัวละคร', 'จำนวนบทพูด', 'อักขระ', 'เวลาประมาณ'],
+    copyAllLines: 'คัดลอกบทพูดทั้งหมด',
+    copy: 'คัดลอก', copied: 'คัดลอกแล้ว', copyFailed: 'คัดลอกไม่สำเร็จ',
+    lineRef: (ep, i) => `E${String(ep).padStart(2, '0')} ฉาก ${i}`,
+    dlgSec: (s) => `${s} วินาที`,
+    fmtMin: (m, s) => `${m} นาที ${s} วินาที`,
+    overBy: (s) => `เกิน ${s} วินาที`,
+    underBy: (s) => `ขาด ${s} วินาที`,
+    legendDlg: 'บทพูด', legendAct: 'การกระทำ', legendBand: 'ช่วงเป้าหมาย',
+    unitLines: 'ประโยค', unitSec: 'วินาที',
+    castMeta: (count, chars, sec) => `${count} ประโยค · ${chars} อักขระ · ประมาณ ${sec} วินาที`,
+    castProps: (c, p) => (p ? `ตัวละคร: ${c} · อุปกรณ์: ${p}` : `ตัวละคร: ${c}`),
+    sep: ', ',
+    colon: ': ',
+    paren: (s) => ` (${s})`,
+    colophon: 'โมเดลเขียนบทจากโครงเรื่องและคู่มืองานศิลป์ โดยสคริปต์ตรวจเวลาและการอ้างอิงแบบกำหนดแน่นอน งานสตอรีบอร์ดและพรอมป์ภาพแรกอยู่ในขั้นตอนถัดไป',
+  },
 };
 
 export const tOf = (lang) => {
-  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / en');
+  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / th / en');
   return I18N[lang ?? 'zh'];
 };
 
@@ -974,7 +1080,7 @@ const USAGE = `novel-script.mjs — novel-script skill 的确定性工具（剧�
            [--art a.json]                   给了上游才做对账（角色 / 场景光照道具 / 爽点认领）
   checkup <script.json> [--outline] [--art] 只打印质量门 ✓/✗，有未过项 exit 1
   render <script.json> [--html|--md]        渲染报告到 stdout（默认 --md）
-         [--lang zh|en]                     报告界面语言（默认中文，或跟 script.json 的 lang 字段）
+         [--lang zh|th|en]                  报告界面语言（默认中文，或跟 script.json 的 lang 字段）
          [--outline o.json] [--art a.json]  给了上游就把 ID 显示成名字
          [--cast cast.json]                 台词本带每个角色的音色提示词（对接 TTS）
   slug <name>                               剧名转安全文件名`;
@@ -1048,7 +1154,7 @@ function main(argv) {
 
   if (cmd === 'render') {
     const [path] = rest;
-    if (!path) throw new Error('用法：render <script.json> [--html|--md] [--lang zh|en] [--outline o.json] [--art a.json]');
+    if (!path) throw new Error('用法：render <script.json> [--html|--md] [--lang zh|th|en] [--outline o.json] [--art a.json]');
     const doc = readJson(path);
     const ctx = loadCtx(rest);
     const lang = flag(rest, '--lang');
