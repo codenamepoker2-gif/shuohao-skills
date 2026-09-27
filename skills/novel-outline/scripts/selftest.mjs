@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  ADAPT_MODE_LABELS,
   ADAPT_MODES,
   DEFAULT_PER_VOLUME,
   DEFAULT_THRESHOLDS,
@@ -24,6 +25,7 @@ import {
   renderMarkdown,
   slug,
   validateOutline,
+  withoutCastNames,
 } from './novel-outline.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -728,6 +730,25 @@ ok(enMd.includes('**[Hook]**') && !enMd.includes('**【钩子】**'), 'EN MD 钩
   ok(gate(o, 'risk-flag').ok, '泰文预警标签能满足生成难点门');
   o.episodes[0].hook = 'เขาพูดว่า “กลับบ้าน”';
   ok(!gate(o, 'no-dialogue').ok, '泰文引号对白被叙述体门拦截');
+
+  const namedRain = clone();
+  namedRain.contentLang = 'th';
+  namedRain.characters[0].name = 'ฝน';
+  namedRain.characters[0].aliases = ['พายุ'];
+  namedRain.episodes.forEach((e) => {
+    e.synopsis = 'ฝนตามหาเบาะแส';
+    e.hook = 'พายุพบหลักฐานใหม่';
+    e.suspense = 'ความจริงยังไม่ครบ';
+    e.warnings = [];
+  });
+  ok(gate(namedRain, 'risk-flag').ok, '泰文角色名ฝน与别名พายุ不会误触发雨戏');
+  eq(withoutCastNames('ฝนพบพายุ', namedRain.characters).trim(), 'พบ', '风险扫描前剔除角色名与别名');
+
+  ok(th.includes('รูปแบบ สกัดแก่น') && !th.includes('รูปแบบ 抽核'), '泰文界面翻译改编模式');
+  ok(th.includes('html[lang="th"] h1') && th.includes('letter-spacing:normal'), '泰文标题与标签关闭字距');
+  eq(ADAPT_MODE_LABELS.en['抽核'], 'essence extraction', '英文改编模式有本地化名称');
+  const en = renderHtml({ ...o, lang: 'en' }, 'en');
+  ok(en.includes('essence extraction adaptation') && !en.includes('抽核 adaptation'), '英文界面翻译改编模式');
 }
 {
   const o = clone();

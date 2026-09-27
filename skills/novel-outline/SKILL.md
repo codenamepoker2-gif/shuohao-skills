@@ -171,7 +171,7 @@ node {baseDir}/scripts/novel-outline.mjs render <outline.json> --html > outline-
 node {baseDir}/scripts/selftest.mjs
 ```
 
-249 项断言，不调模型、不花额度。14 道质量门每一道都有击穿用例——证明它真的会拦。改完脚本先跑这个。
+266 项断言，不调模型、不花额度。14 道质量门每一道都有击穿用例——证明它真的会拦。改完脚本先跑这个。
 
 ## 自带样例
 

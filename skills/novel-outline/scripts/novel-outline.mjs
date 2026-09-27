@@ -16,6 +16,11 @@ import { fileURLToPath } from 'node:url';
  */
 
 export const ADAPT_MODES = ['忠实', '抽核', '借壳'];
+export const ADAPT_MODE_LABELS = {
+  zh: { 忠实: '忠实', 抽核: '抽核', 借壳: '借壳' },
+  th: { 忠实: 'ซื่อตรง', 抽核: 'สกัดแก่น', 借壳: 'ยืมโครง' },
+  en: { 忠实: 'faithful', 抽核: 'essence extraction', 借壳: 'reframed' },
+};
 export const BEAT_WEIGHTS = ['major', 'minor'];
 export const CONTENT_LANGS = ['zh', 'th', 'en'];
 
@@ -98,6 +103,14 @@ const DIALOGUE_RE = {
 };
 
 const contentLangOf = (doc) => CONTENT_LANGS.includes(doc?.contentLang) ? doc.contentLang : 'zh';
+
+/** Remove this outline's cast names before matching production-risk keywords. */
+export function withoutCastNames(text, characters = []) {
+  const names = characters.flatMap((c) => [c?.name, ...(Array.isArray(c?.aliases) ? c.aliases : [])])
+    .filter((name) => typeof name === 'string' && name.trim())
+    .sort((a, b) => b.length - a.length);
+  return names.reduce((cleaned, name) => cleaned.replaceAll(name, ' '), String(text ?? ''));
+}
 
 /* ------------------------------------------------------------------ */
 /* chunk — 按章节分卷                                                   */
@@ -317,7 +330,7 @@ export function gateReport(outline) {
   // G9 生成难点进预警清单（关键词扫描，宁可多报）
   const riskBad = [];
   for (const e of eps) {
-    const text = EP_TEXT_FIELDS.map((f) => e?.[f] ?? '').join(' ');
+    const text = withoutCastNames(EP_TEXT_FIELDS.map((f) => e?.[f] ?? '').join(' '), outline?.characters);
     for (const [risk, re] of Object.entries(RISK_PATTERNS_BY_LANG[contentLang])) {
       if (re.test(text) && !(e?.warnings ?? []).includes(risk)) riskBad.push(`第 ${e.ep} 集缺「${risk}」`);
     }
@@ -662,12 +675,26 @@ const gateText = (g, lang) => {
   if (lang === 'th') {
     detail = String(detail)
       .replace(/^缺：/, 'ขาด: ')
+      .replaceAll('缺「', 'ขาด「')
       .replace(/第\s*(\d+)\s*集/g, 'ตอนที่ $1')
+      .replace(/ตอนที่ (\d+)ขาด/g, 'ตอนที่ $1 ขาด')
       .replace(/(\d+)\s*位/g, '$1 คน')
       .replace(/(\d+)\s*个/g, '$1 รายการ')
       .replace(/(\d+)\s*件/g, '$1 ชิ้น')
       .replace('没有 major 爽点', 'ไม่มีจุดพีคใหญ่')
       .replace('出现引号', 'มีข้อความในเครื่องหมายคำพูด');
+  } else if (lang === 'en') {
+    detail = String(detail)
+      .replace(/^缺：/, 'Missing: ')
+      .replaceAll('缺「', 'missing “')
+      .replaceAll('」', '”')
+      .replace(/第\s*(\d+)\s*集/g, 'Episode $1')
+      .replace(/Episode (\d+)missing/g, 'Episode $1 missing')
+      .replace(/(\d+)\s*位/g, '$1 people')
+      .replace(/(\d+)\s*个/g, '$1 items')
+      .replace(/(\d+)\s*件/g, '$1 props')
+      .replace('没有 major 爽点', 'no major beats')
+      .replace('出现引号', 'contains quoted dialogue');
   }
   return { label, detail };
 };
@@ -679,7 +706,7 @@ const I18N = {
     kicker: '短剧改编大纲',
     docTitle: (s) => `${s} · 短剧改编大纲`,
     paramsLine: (p) =>
-      `${p.episodes} 集 × ${p.minutesPerEpisode} 分钟 · ${p.genre} · ${p.adaptMode}改编`,
+      `${p.episodes} 集 × ${p.minutesPerEpisode} 分钟 · ${p.genre} · ${ADAPT_MODE_LABELS.zh[p.adaptMode] ?? p.adaptMode}改编`,
     exportJson: '导出 JSON',
     gates: '质量门',
     gatesPass: '全部通过',
@@ -776,7 +803,7 @@ const I18N = {
     kicker: 'Short-drama adaptation outline',
     docTitle: (s) => `${s} · Short-Drama Adaptation Outline`,
     paramsLine: (p) =>
-      `${p.episodes} eps × ${p.minutesPerEpisode} min · ${p.genre} · ${p.adaptMode} adaptation`,
+      `${p.episodes} eps × ${p.minutesPerEpisode} min · ${p.genre} · ${ADAPT_MODE_LABELS.en[p.adaptMode] ?? p.adaptMode} adaptation`,
     exportJson: 'Export JSON',
     gates: 'Quality gates',
     gatesPass: 'All passed',
@@ -874,7 +901,7 @@ const I18N = {
   th: {
     langCode: 'th', htmlLang: 'th', kicker: 'โครงเรื่องดัดแปลงสำหรับซีรีส์สั้น',
     docTitle: (s) => `${s} · โครงเรื่องซีรีส์สั้น`,
-    paramsLine: (p) => `${p.episodes} ตอน × ${p.minutesPerEpisode} นาที · ${p.genre} · รูปแบบ ${p.adaptMode}`,
+    paramsLine: (p) => `${p.episodes} ตอน × ${p.minutesPerEpisode} นาที · ${p.genre} · รูปแบบ ${ADAPT_MODE_LABELS.th[p.adaptMode] ?? p.adaptMode}`,
     exportJson: 'ส่งออก JSON', gates: 'ด่านคุณภาพ', gatesPass: 'ผ่านทั้งหมด',
     gatesFail: (n) => `ไม่ผ่าน ${n} ข้อ`, gatePill: (okN, total) => `ด่านคุณภาพ ${okN} / ${total}`,
     sections: {
@@ -1193,7 +1220,7 @@ export function renderHtml(outline, lang) {
   <div class="kpi"><div class="l">${esc(t.kpi.cast)}</div><div class="v">${characters.length}</div><div class="d">${esc(t.kpi.castSub(tierN.lead ?? 0, tierN.support ?? 0, tierN.functional ?? 0))}</div></div>
   <div class="kpi"><div class="l">${esc(t.kpi.scenes)}</div><div class="v">${primaryScenes.length}${assets.scenes.length > primaryScenes.length ? ` <small>+${assets.scenes.length - primaryScenes.length}</small>` : ''}</div><div class="d">${esc(t.kpi.scenesOnce(onceScenes.length))}</div></div>
   <div class="kpi"><div class="l">${esc(t.kpi.risks)}</div><div class="v">${riskTotal}</div><div class="d">${esc(riskTotal ? snip(riskSub, 24) : t.kpi.risksNone)}</div></div>
-  <div class="kpi"><div class="l">${esc(t.kpi.mode)}</div><div class="v mode">${esc(params.adaptMode)}</div><div class="d">${esc(t.kpi.modeSub(ad.cut.length, ad.merge.length))}</div></div>
+  <div class="kpi"><div class="l">${esc(t.kpi.mode)}</div><div class="v mode">${esc(ADAPT_MODE_LABELS[lang]?.[params.adaptMode] ?? params.adaptMode)}</div><div class="d">${esc(t.kpi.modeSub(ad.cut.length, ad.merge.length))}</div></div>
 </div>`;
 
   // ---- 分集卡 ----
@@ -1353,6 +1380,10 @@ export function renderHtml(outline, lang) {
 body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
 .page{max-width:1600px;margin:0 auto;padding:24px 32px 90px}
 h1,h2,h3{margin:0;font-weight:400}
+html[lang="th"] h1,html[lang="th"] h2,html[lang="th"] h3,html[lang="th"] th,
+html[lang="th"] .kpi .l,html[lang="th"] .tab,html[lang="th"] .epsmore,
+html[lang="th"] .dmaj em,html[lang="th"] .hk b,html[lang="th"] .matrix tr.div td,
+html[lang="th"] .srow b,html[lang="th"] h3.sub{letter-spacing:normal}
 
 .hd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:12px}
 .hd h1{font:400 28px/1.1 var(--serif);letter-spacing:.06em}
@@ -1699,11 +1730,18 @@ const cliFor = (lang) => {
   if (!CLI_TEXT[lang]) throw new Error('界面语言必须是 zh / th / en');
   return CLI_TEXT[lang];
 };
-const problemText = (message, lang) => {
+const problemText = (message, lang, outline = null) => {
   if (lang === 'zh') return message;
+  if (outline && String(message).startsWith('质量门未过：')) {
+    const matching = gateReport(outline).find((g) => !g.ok && message === `质量门未过：${g.label}${g.detail ? `（${g.detail}）` : ''}`);
+    if (matching) {
+      const shown = gateText(matching, lang);
+      return `${lang === 'th' ? 'ไม่ผ่านด่านคุณภาพ' : 'Quality gate failed'}: ${shown.label}${shown.detail ? ` (${shown.detail})` : ''}`;
+    }
+  }
   const pairs = lang === 'th'
-    ? [['质量门未过', 'ไม่ผ่านด่านคุณภาพ'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ'], ['超过上限', 'เกินขีดจำกัด'], ['第 ', 'ตอนที่ '], [' 集', '']]
-    : [['质量门未过', 'Quality gate failed'], ['缺少', 'Missing '], ['缺失', 'missing'], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated'], ['超过上限', 'exceeds the limit'], ['第 ', 'Episode '], [' 集', '']];
+    ? [['质量门未过', 'ไม่ผ่านด่านคุณภาพ'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['缺「', 'ขาด「'], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ'], ['超过上限', 'เกินขีดจำกัด'], ['第 ', 'ตอนที่ '], [' 集', '']]
+    : [['质量门未过', 'Quality gate failed'], ['缺少', 'Missing '], ['缺失', 'missing'], ['缺「', 'missing “'], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated'], ['超过上限', 'exceeds the limit'], ['第 ', 'Episode '], [' 集', '']];
   return pairs.reduce((text, [from, to]) => text.replaceAll(from, to), String(message));
 };
 
@@ -1754,7 +1792,7 @@ function main(argv) {
     const problems = validateOutline(outline, stage);
     if (problems.length) {
       console.error(cli.failed(problems.length, stage));
-      for (const x of problems) console.error('  ' + problemText(x, cliLang));
+      for (const x of problems) console.error('  ' + problemText(x, cliLang, outline));
       process.exit(1);
     }
     console.log(cli.passed(stage));
