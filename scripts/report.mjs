@@ -52,6 +52,8 @@ export const PANES = [
     dir: 'outline',
     label: '大纲',
     labelEn: 'Outline',
+    labelTh: 'โครงเรื่อง',
+    hintTh: 'โครงสร้างการดัดแปลงและตอน',
     hint: '改编结构与分集',
     hintEn: 'Adaptation & episodes',
     needs: [],
@@ -63,6 +65,8 @@ export const PANES = [
     dir: 'characters',
     label: '角色',
     labelEn: 'Characters',
+    labelTh: 'ตัวละคร',
+    hintTh: 'ประวัติและภาพออกแบบ',
     hint: '画像与设定图',
     hintEn: 'Profiles & sheets',
     needs: [],
@@ -74,6 +78,8 @@ export const PANES = [
     dir: 'art',
     label: '美术',
     labelEn: 'Art',
+    labelTh: 'งานศิลป์',
+    hintTh: 'ฉากและอุปกรณ์ประกอบฉาก',
     hint: '场景与道具',
     hintEn: 'Scenes & props',
     needs: ['--cast'],
@@ -85,6 +91,8 @@ export const PANES = [
     dir: 'script',
     label: '剧本',
     labelEn: 'Screenplay',
+    labelTh: 'บทละคร',
+    hintTh: 'ฉาก จังหวะเรื่อง และบทพูด',
     hint: '场次、节拍、台词',
     hintEn: 'Scenes, beats, lines',
     needs: ['--outline', '--art', '--cast'],
@@ -96,6 +104,8 @@ export const PANES = [
     dir: 'storyboard',
     label: '分镜',
     labelEn: 'Storyboard',
+    labelTh: 'สตอรีบอร์ด',
+    hintTh: 'ช่วงภาพ ช็อต และภาพหลัก',
     hint: '段、分镜、首帧',
     hintEn: 'Segments, cuts, frames',
     needs: ['--script', '--outline', '--art', '--cast'],
@@ -331,7 +341,29 @@ const SHELL_I18N = {
     empty: 'No stage produced anything — pass at least one json',
     htmlLang: 'en',
   },
+  th: {
+    kicker: 'รายงานการผลิตละครสั้น',
+    nav: 'ขั้นตอนการผลิต',
+    expandAll: 'แสดงทั้งหมด',
+    expandHint: 'แสดงทุกส่วนเพื่อค้นหาทั้งรายงานด้วย Cmd+F',
+    collapse: 'กลับไปแสดงทีละส่วน',
+    empty: 'ไม่พบผลงาน กรุณาระบุไฟล์ JSON อย่างน้อยหนึ่งไฟล์',
+    htmlLang: 'th',
+  },
 };
+
+function paneText(meta, key, lang) {
+  return meta[key + ({ en: 'En', th: 'Th' }[lang] ?? '')] ?? meta[key];
+}
+
+export function resolveLanguage(explicit, data = {}) {
+  const lang = explicit ?? data.lang ?? 'zh';
+  return Object.hasOwn(SHELL_I18N, lang) ? lang : 'zh';
+}
+
+function cliText(lang, zh, en, th) {
+  return lang === 'th' ? th : lang === 'en' ? en : zh;
+}
 
 /**
  * 外壳布局：左侧固定导航 + 右侧内容区。
@@ -346,7 +378,7 @@ export function renderShell(panes, { title = '', lang = 'zh', subtitle = '' } = 
     .map(
       (p, i) => `<button class="rp-nv${i === 0 ? ' rp-on' : ''}" data-pane="${esc(p.paneId)}" type="button">
   <span class="rp-nv-i">${String(i + 1)}</span>
-  <span class="rp-nv-t"><b>${esc(lang === 'en' ? p.meta.labelEn : p.meta.label)}</b><small>${esc(lang === 'en' ? p.meta.hintEn : p.meta.hint)}</small></span>
+  <span class="rp-nv-t"><b>${esc(paneText(p.meta, 'label', lang))}</b><small>${esc(paneText(p.meta, 'hint', lang))}</small></span>
 </button>`,
     )
     .join('\n');
@@ -499,7 +531,7 @@ ${panes.map((p) => (p.js ? `<script>\n${p.js}\n</script>` : '')).filter(Boolean)
 
 const USAGE = `report.mjs —— 把 novel 系列各 skill 的报告合成一张单页
 
-  node scripts/report.mjs --from <demo目录> [--out report.html] [--lang zh|en]
+  node scripts/report.mjs --from <demo目录> [--out report.html] [--lang zh|en|th]
   node scripts/report.mjs --outline o.json --cast c.json … [--out report.html]
 
   --from <目录>      按端到端 demo 工作目录约定自动发现：
@@ -510,11 +542,25 @@ const USAGE = `report.mjs —— 把 novel 系列各 skill 的报告合成一张
   --script <f>
   --storyboard <f>
   --out <f>          输出路径，默认 report.html
-  --lang zh|en       外壳与各报告的界面语言，默认 zh
+  --lang zh|en|th       外壳与各报告的界面语言，默认 zh
   --title <s>        左上角标题，默认取第一份 json 的 source
 
   **给了哪几段就出哪几个面板**——只有角色就只有一个面板，五段齐全就是五个。
   各 skill 的 render 一行不改，仍然可以单独出各自的报告。`;
+
+function usage(lang) {
+  if (lang === 'zh') return USAGE;
+  return cliText(lang, USAGE,
+    'report.mjs — assemble stage reports into one page',
+    'report.mjs — รวมรายงานแต่ละขั้นตอนเป็นหน้าเดียว') + `
+
+  node scripts/report.mjs --from <directory> [--out report.html] [--lang zh|en|th]
+  node scripts/report.mjs --outline o.json --cast c.json --art a.json --script s.json --storyboard b.json
+
+` + cliText(lang, '',
+    '--from discovers stage JSON files. Explicit paths override discovery. --out defaults to report.html. --title overrides the source title. UI language: --lang > first stage JSON lang > zh. Only available stages are included.',
+    '--from ค้นหาไฟล์ JSON ของแต่ละขั้นตอน โดยเส้นทางที่ระบุเองมีลำดับความสำคัญสูงกว่า --out มีค่าเริ่มต้นเป็น report.html และ --title ใช้กำหนดชื่อรายงาน ภาษา UI เลือกตาม --lang > lang ใน JSON ขั้นตอนแรก > zh รวมเฉพาะขั้นตอนที่มีข้อมูล');
+}
 
 function flag(argv, name, fallback = null) {
   const i = argv.indexOf(name);
@@ -534,13 +580,13 @@ function findJson(dir, skill) {
 
 function main(argv) {
   if (!argv.length || argv.includes('-h') || argv.includes('--help')) {
-    console.log(USAGE);
+    console.log(usage(resolveLanguage(flag(argv, '--lang'))));
     return;
   }
   const from = flag(argv, '--from');
   const outPath = resolve(flag(argv, '--out', 'report.html'));
   const outDir = dirname(outPath);
-  const lang = flag(argv, '--lang', 'zh');
+  let lang = resolveLanguage(flag(argv, '--lang'));
 
   // 路径来源：显式参数优先，其次从 --from 目录自动发现
   const paths = {};
@@ -550,7 +596,10 @@ function main(argv) {
   }
 
   const chosen = PANES.filter((p) => paths[p.flag]);
-  if (!chosen.length) throw new Error(`没有找到任何一段的产出。\n\n${USAGE}`);
+  if (!chosen.length) throw new Error(`${SHELL_I18N[lang].empty}\n\n${usage(lang)}`);
+  let firstData = {};
+  try { firstData = JSON.parse(readFileSync(paths[chosen[0].flag], 'utf8')); } catch { /* renderer reports malformed input */ }
+  lang = resolveLanguage(flag(argv, '--lang'), firstData);
 
   const panes = [];
   for (const p of chosen) {
@@ -572,7 +621,7 @@ function main(argv) {
       });
     } catch (e) {
       const why = (e.stderr || e.message || '').trim().split('\n')[0];
-      console.error(`⚠️ ${p.skill} 这一段没渲染出来，跳过：${why}`);
+      console.error(`⚠️ ${p.skill} ${cliText(lang, '这一段没渲染出来，跳过：', 'Could not render this stage; skipped: ', 'แสดงรายงานขั้นตอนนี้ไม่สำเร็จ จึงข้าม: ')}${why}`);
       continue;
     }
     const pane = makePane(html, { id: p.id, fromDir: dirname(jsonPath), outDir });
@@ -580,7 +629,7 @@ function main(argv) {
     panes.push(pane);
   }
 
-  if (!panes.length) throw new Error('每一段都没渲染成功，没有可合成的内容');
+  if (!panes.length) throw new Error(cliText(lang, '每一段都没渲染成功，没有可合成的内容', 'No stage rendered successfully; nothing to assemble', 'สร้างรายงานไม่สำเร็จทุกขั้นตอน จึงไม่มีเนื้อหาให้รวม'));
 
   const titleFlag = flag(argv, '--title');
   let title = titleFlag;
@@ -592,10 +641,10 @@ function main(argv) {
     if (!title) title = basename(first).replace(/[-_](cast|outline|art|script|storyboard)\.json$/i, '').replace(/\.json$/i, '');
   }
 
-  const sub = panes.map((p) => (lang === 'en' ? p.meta.labelEn : p.meta.label)).join(lang === 'en' ? ' · ' : ' · ');
+  const sub = panes.map((p) => paneText(p.meta, 'label', lang)).join(' · ');
   writeFileSync(outPath, renderShell(panes, { title, lang, subtitle: sub }));
-  console.log(`✓ ${panes.length} 个面板 → ${relative(process.cwd(), outPath) || outPath}`);
-  for (const p of panes) console.log(`    ${lang === 'en' ? p.meta.labelEn : p.meta.label}  ${p.title || ''}`);
+  console.log(`✓ ${panes.length} ${cliText(lang, '个面板', 'panes', 'ส่วน')} → ${relative(process.cwd(), outPath) || outPath}`);
+  for (const p of panes) console.log(`    ${paneText(p.meta, 'label', lang)}  ${p.title || ''}`);
 }
 
 function isMainModule() {

@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {
   PANES,
+  resolveLanguage,
   makePane,
   rebaseAssets,
   renderShell,
@@ -255,6 +256,26 @@ const DOC = `<!doctype html><html lang="zh"><head><meta charset="utf-8">
   ok(!/<link\b/i.test(html), '没有外链样式表');
   ok(!/<script[^>]+\bsrc=/i.test(html), '没有外链脚本');
   ok(!/https?:\/\/(?!x\.com)/.test(html.replace(/https:\/\/json-schema\.org[^"']*/g, '')), '没有外部请求');
+}
+
+// Thai shell, source preservation, and language precedence.
+{
+  const panes = PANES.map(meta => ({ ...makePane(DOC, { id: meta.id }), meta }));
+  const th = renderShell(panes, { title: 'เรื่องที่ท่าเรือ', lang: 'th' });
+  ok(th.includes('<html lang="th">'), 'Thai document language');
+  ok(th.includes('รายงานการผลิตละครสั้น'), 'Thai report heading');
+  ok(th.includes('แสดงทั้งหมด'), 'Thai show-all button');
+  ok(th.includes('กลับไปแสดงทีละส่วน'), 'Thai collapse control');
+  ok(th.includes('เรื่องที่ท่าเรือ'), 'Thai source title is preserved');
+  ok(!th.includes('平铺全部'), 'No Chinese shell button in Thai');
+  for (const meta of PANES) {
+    ok(th.includes(meta.labelTh), `${meta.id} Thai navigation label`);
+    ok(th.includes(meta.hintTh), `${meta.id} Thai navigation hint`);
+  }
+  eq(resolveLanguage('en', { lang: 'th' }), 'en', 'CLI language overrides JSON');
+  eq(resolveLanguage(undefined, { lang: 'th' }), 'th', 'JSON Thai language');
+  eq(resolveLanguage(undefined, {}), 'zh', 'Chinese remains default');
+  eq(resolveLanguage('unknown', { lang: 'th' }), 'zh', 'Unknown language preserves fallback');
 }
 
 console.log(`✓ ${passed} 项自测全部通过`);
