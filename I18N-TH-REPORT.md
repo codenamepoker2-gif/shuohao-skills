@@ -65,3 +65,37 @@ Render evidence — every skill rendered its **own** examples with `--lang th` a
 - **UI dictionaries cover labels, not prose quality.** The Thai strings were written to read naturally, but the studio should review report wording (especially gate-failure text) once in real use and adjust the `th` dictionaries in place.
 - **Per-language prompt protocol is Chinese/English only.** The H3/Seedance prompt protocol and prompt-language gates audit `zh` and `en` prompts; there is no `promptLang: "th"` (by upstream rule, prompts stay English for Thai productions — so this only matters if the studio later wants Thai on-screen dialogue tags).
 - **Untested on other platforms.** Same caveat as upstream: verified on macOS + current Node only.
+
+## Round 2 (2026-09-27)
+
+Round 1 (above) established Thai/English UI and content-language support. Round 2 closes the nine gaps from `.codex-brief-2.md` / `demo-th/FINDINGS.md`. Per-skill commits bundle the fixes carried by that skill's files; every fix below names the regression assertions that guard it. **All nine are done; no existing assertion was deleted or loosened — each suite only grew.**
+
+| # | Fix (from `.codex-brief-2.md`) | What was done | Commit | Guarding test |
+| --- | --- | --- | --- | Round 1 → Round 2 |
+| 1 | Outline rain keyword `ฝน` fires on the character name | `withoutCastNames()` strips cast names and aliases (longest first) before the risk-keyword scan, in every language | `0a9726e` | `selftest.mjs` 745: `withoutCastNames('ฝนพบพายุ', …) → 'พบ'` — 260 → **266** |
+| 2 | One-syllable Thai names collide with ordinary words (`ต้น`/ต้นไม้, `ฝน`/ฝนตก) | Boundary-aware matching via `Intl.Segmenter('th')` with narrow lexical exceptions; zh/en keep substring matching. Applied in novel-characters (`promptContainsCharacterName`) and novel-storyboard (`containsBannedName` + `THAI_NAME_COMPOUNDS`) | `9325029` (characters), `15a8b09` (storyboard) | characters selftest 863–869 (ต้น hits, ต้นไม้/ตอนต้น/วัยต้น don't; ฝน hits, ฝนตก doesn't; zh/en unchanged) — 347 → **363**; storyboard selftest 203–208 — 331 → **346** |
+| 3 | Seedance export mixes zh labels + Thai fields + en shot text | With `contentLang` th/en the whole model-facing block is English: labels, English `*Prompt` override fields (missing override = loud failure, not silent), English default constraints (no subtitles / no twins); dialogue keeps its spoken language in `{}` | `15a8b09` | storyboard selftest 216–225 (English labels + verbatim Thai dialogue; **「非中文 Seedance 默认约束也是英文」— the Round-1 failing assertion now passes with crowded-cut data**; missing-override throws) |
+| 4 | CLI pass/fail output still Chinese with `--lang th` | `CLI_TEXT` th/en tables across novel-characters, novel-script, novel-art, novel-storyboard (outline already done in Round 1); usage, summaries, diagnostics, gate-skip notes all follow `--lang`; each new lane has a `spawnSync` regression asserting no CJK in Thai output | `9325029` (characters), `f89be2b` (script), `6c251fe` (art), `15a8b09` (storyboard) | characters CLI block (363 total), script problemText + CLI blocks (184), art `checkup --lang th` CLI block (170), storyboard CLI block (346) |
+| 5 | `shotPrompt` undocumented | Documented the all-English rule and the `shotPrompt` / `*Prompt` override family in `schema.md`, `seedance-prompt.md`, `SKILL.md`, all three storyboard READMEs, and the root READMEs | `15a8b09` (storyboard), `d281f69` (root) | The documented contract is the behavior asserted by fix 3's tests (216–225) and the export-label test at 933; docs kept in sync in the same commits |
+| 6 | novel-art `render` can't take the cast; skip text Chinese-only | `render --cast` runs the name-ban gate inside the report; omitting it announces the skip; gate failure/skip details translate via `gateText` (th/en) | `6c251fe` | art selftest `render --cast --lang th` + `checkup --lang th` CLI blocks — 164 → **170** |
+| 7 | คัต vs ช็อต terminology split | GATE_LABELS_TH and all remaining UI now say ช็อต consistently (คัต removed) | `15a8b09` | storyboard selftest 1004–1007: rendered Thai report contains ช็อต and no คัต, gate labels included |
+| 8 | Thai letter-spacing splits glyphs ("เ รื่ อ ง") | `html:lang(th)` (and `html:lang(en)`) `letter-spacing: normal` on headings/labels in outline, characters, script, art reports; assembler + character-refs already fixed in Round 1 | `0a9726e` (outline), `9325029` (characters), `f89be2b` (script), `6c251fe` (round-1-committed assembler/character-refs) | Each skill's selftest renders in Thai; story text preserved verbatim (existing assertions, all still passing) |
+| 9 | Leftover zh in Thai UI ("รูปแบบ 抽核") | `ADAPT_MODE_LABELS` th/en (ซื่อตรง/สกัดแก่น/ยืมโครง, faithful/essence extraction/reframed) | `0a9726e` | outline selftest 747–751: Thai and English reports translate the adapt-mode label, zh untouched |
+
+### Final counts
+
+```sh
+for f in skills/*/scripts/selftest.mjs; do node "$f"; done
+node scripts/report-selftest.mjs
+```
+
+character-refs 244, novel-art 170, novel-characters 363, novel-outline 266, novel-script 184, novel-storyboard 346 — all passing; report assembler 113. Total 1,686 assertions, up from 1,578 at the end of Round 1, with zero assertions deleted or loosened.
+
+Round 2 commits (all local on `feat/th-en-i18n`, author `codenamepoker2-gif`, not pushed):
+
+- `0a9726e` Outline: exclude cast names from risk-keyword scan, translate adapt modes, Thai letter-spacing
+- `9325029` Characters: Thai word-boundary name matching, localized CLI output
+- `f89be2b` Script: localized CLI output, Thai letter-spacing
+- `6c251fe` Art: render --cast runs the name-ban gate inside reports, Thai gate details
+- `15a8b09` Storyboard: all-English Seedance for non-Chinese content, Thai name boundaries, localized CLI, shotPrompt docs, ช็อต terminology
+- `d281f69` Docs: sync selftest counts and add root-README shotPrompt note
