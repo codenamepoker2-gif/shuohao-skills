@@ -116,9 +116,12 @@ node scripts/novel-storyboard.mjs render sb.json --html --lang en \
 node scripts/novel-storyboard.mjs render sb.json --html --lang th \
      --script script.json --outline outline.json --art art.json > storyboard-report.html   # 泰文界面报告
 node scripts/novel-storyboard.mjs export sb.json --script script.json   # H3 投产包
+node scripts/novel-storyboard.mjs export sb.json --script script.json --lang th   # 投产包头部说明也是泰文
 ```
 
 `export` 的投产结构固定：**每段一个文件夹** `E01-01/`——分镜图 `f1..fN.png` 和 `prompt.md` 同住（头部 Picture ↔ 文件对照表**明确 f1.png 是首帧**、各图钉在第几秒，分隔线以下是 h3Prompt 原样），根部 `manifest.json` 带 Picture 序图清单、切点时刻表、缺图标注。一个段文件夹 = 一次 H3 生成的全部材料。
+
+投产包里写给人看的部分**跟界面语言走**（与 render 同一条 `--lang` > JSON 顶层 `lang` 字段 > 默认中文的优先级）：`prompt.md` / `seedance.md` 的标题、挂图说明、逐图秒数标注与 `manifest.json` 的附件标注（附件编号 `@图片N` / `@ImageN`）都翻成对应语言；**分隔线以下的提示词正文不动**——那是发给视频模型的，按 `promptLang` / `contentLang` 的既有规则走。设定图的标注是内容名（设定图文件名就由它派生），任何界面语言下原样保留。
 
 ## 边界
 
@@ -134,7 +137,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # H3 投
 SKILL.md                 给 agent 读的工作流
 scripts/
   novel-storyboard.mjs   seed / validate / checkup / render / export / slug
-  selftest.mjs           346 项断言，不调模型
+  selftest.mjs           536 项断言，不调模型
 references/
   schema.md              storyboard.json 结构 + 时长约束链
   h3-prompt.md           H3 提示词写法规范（官方方法论内化版）
@@ -153,6 +156,6 @@ assets/
 node scripts/selftest.mjs
 ```
 
-346 项断言，覆盖节拍展开 / H3 骨架推导 / Seedance 拼装 / 统计与批次 / 质量门逐项击穿 / 配方卡库解析与挂载 / seed / 泰文内容语言与折算 / 渲染（三语界面）/ H3 与 Seedance 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
+536 项断言，覆盖节拍展开 / H3 骨架推导 / Seedance 拼装 / 统计与批次 / 质量门逐项击穿 / 配方卡库解析与挂载 / seed / 泰文内容语言与折算 / 渲染（三语界面）/ H3 与 Seedance 导出（zh 逐字节不变、th/en 头部与 manifest 标注无 CJK）。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
 
 **只在 macOS + Node 24 上实测过。** 代码没有平台相关调用，Linux 和更低版本 Node 理论上没问题，但**没验过**。

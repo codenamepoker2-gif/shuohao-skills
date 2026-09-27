@@ -120,7 +120,7 @@ node {baseDir}/scripts/novel-storyboard.mjs render <剧名>-storyboard.json --ht
   --script <script.json> --outline <outline.json> --art <art.json> > storyboard-report.html
 ```
 
-报告界面语言用 `--lang zh|th|en` 指定（优先级 `--lang` > JSON 顶层 `lang` 字段 > 默认中文）——只切界面标签，与 `promptLang`（H3 提示词语言）互相独立。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`），泰文台词按 13 个基础字符/秒折算（不计组合元音与声调符号）。`render` 用 `--frames <目录>` 找分镜图（`<目录>/<段号>/f<切序>.png`，默认当前目录）、用 `--images <目录>` 找批次单的场景设定图（`<目录>/<场景 slug>-sheet.png`，默认 `./images`），两个都可以指到任意路径——**本 skill 不产生这些文件**，下游出完图重跑一次 render 就能嵌进报告。`export --frames <目录>` 会把找得到的分镜图拷进投产包，不用手动往包里放。报告含：KPI 带、分镜节奏带（粗分隔 = 段边界、片宽 = 分镜时长占比、颜色深浅 = 景别远近、点击跳段卡）、分集分镜表（主分镜图 + 子分镜条 + 逐切分镜行 + 分镜图/H3 提示词复制按钮）、生成批次单、配音对齐单、质量门、导出 JSON。Markdown 版每段附完整 H3 提示词，直接复制可用。
+报告界面语言用 `--lang zh|th|en` 指定（优先级 `--lang` > JSON 顶层 `lang` 字段 > 默认中文）——只切界面标签，与 `promptLang`（H3 提示词语言）互相独立。`export` 的投产包里写给人看的部分（prompt.md / seedance.md 的头部说明与 manifest 附件标注）跟同一个 `--lang` 走；分隔线以下的提示词正文不跟界面，按 `promptLang` / `contentLang` 走。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`），泰文台词按 13 个基础字符/秒折算（不计组合元音与声调符号）。`render` 用 `--frames <目录>` 找分镜图（`<目录>/<段号>/f<切序>.png`，默认当前目录）、用 `--images <目录>` 找批次单的场景设定图（`<目录>/<场景 slug>-sheet.png`，默认 `./images`），两个都可以指到任意路径——**本 skill 不产生这些文件**，下游出完图重跑一次 render 就能嵌进报告。`export --frames <目录>` 会把找得到的分镜图拷进投产包，不用手动往包里放。报告含：KPI 带、分镜节奏带（粗分隔 = 段边界、片宽 = 分镜时长占比、颜色深浅 = 景别远近、点击跳段卡）、分集分镜表（主分镜图 + 子分镜条 + 逐切分镜行 + 分镜图/H3 提示词复制按钮）、生成批次单、配音对齐单、质量门、导出 JSON。Markdown 版每段附完整 H3 提示词，直接复制可用。
 
 汇报一句话说清：几集几镜、总时长 vs 目标、几个生成批次、报告路径；没过的门明说。
 
@@ -179,7 +179,7 @@ node {baseDir}/scripts/novel-storyboard.mjs stats
 node {baseDir}/scripts/selftest.mjs
 ```
 
-346 项断言，不调模型、不花额度。18 道质量门每一道都有击穿用例。改完脚本先跑这个。
+536 项断言，不调模型、不花额度。18 道质量门每一道都有击穿用例。改完脚本先跑这个。
 
 ## 自带样例
 

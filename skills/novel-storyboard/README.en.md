@@ -110,7 +110,10 @@ node scripts/novel-storyboard.mjs render sb.json --html --script script.json --o
 node scripts/novel-storyboard.mjs render sb.json --html --lang en --script script.json --outline outline.json --art art.json > storyboard-report.html   # English report UI
 node scripts/novel-storyboard.mjs render sb.json --html --lang th --script script.json --outline outline.json --art art.json > storyboard-report.html   # Thai report UI
 node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-segment folders: f1..fN.png + prompt.md
+node scripts/novel-storyboard.mjs export sb.json --script script.json --lang th   # the pack's human-facing header is Thai too
 ```
+
+The pack's human-facing parts follow the report UI language (same priority as `render`: `--lang` > the JSON top-level `lang` field > Chinese): the `prompt.md` / `seedance.md` title, the Picture↔file instructions, the per-image timing marks, and the `manifest.json` attachment labels (attachment tokens `@图片N` / `@ImageN`) are all written in the UI language. The prompt body below the `---` separator is **not** affected — it keeps following the existing `promptLang` / `contentLang` rules, since it is what gets sent to the video model. The reference-sheet label is a content name (the sheet file name derives from it), so it stays verbatim in every UI language.
 
 ## Limits
 
@@ -126,7 +129,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-se
 node scripts/selftest.mjs
 ```
 
-346 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, Thai content timing, rendering (all three report UI languages), H3 and Seedance export. No model calls, runs in about a second.
+536 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, Thai content timing, rendering (all three report UI languages), H3 and Seedance export (zh byte-identical, th/en headers and manifest labels CJK-free). No model calls, runs in about a second.
 
 The bundled example (`examples/渡口-storyboard.json`) is a complete episode-1 storyboard — 10 segments, 34 cuts claiming all 35 script beats at ~3.5s per cut, 119s against a 120s target, 2 generation batches, every segment carrying a fully audited H3 prompt.
 

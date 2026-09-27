@@ -1032,15 +1032,73 @@ export function seedFromScript(script, epRange = null) {
  * 纯函数返回文件清单与要拷的设定图，落盘在 CLI 层——可测性。
  *
  * @param opts.protocol     'h3'（默认）| 'seedance'
+ * @param opts.lang         投产包界面语言 'zh'（默认）| 'th' | 'en'；CLI 传 --lang，
+ *                          缺省回落 JSON 顶层 lang 字段——与 render 同一条优先级
  * @param opts.imageExists  包内相对路径 → 是否已有（分镜图）
  * @param opts.sheetExists  设定图文件名 → 是否找得到（Seedance 参考图路径用）
  * @param opts.names        { scene, char, prop } → 显示名；opts.constraints 全局约束
  */
+/*
+ * 投产包里写给人看的行跟界面语言走：prompt.md / seedance.md 的标题、挂图说明、
+ * 秒数标注与 manifest 的附件标注。分隔线以下的提示词正文是发给视频模型的，不动——
+ * 它按 promptLang / contentLang 的既有规则走，不跟界面语言。
+ * zh 表就是改动前的原文：zh 导出逐字节不变。th/en 导出把头部翻成界面语言，
+ * 附件编号也从 @图片N 换成 @ImageN；设定图的标注是内容名（设定图文件名就由它
+ * 派生，<名>-sheet.png），th/en 原样保留——它是文件名不是界面文案。
+ */
+const PACK_TEXT = {
+  zh: {
+    h3Title: 'H3 提示词',
+    h3Lead: (f) => `首帧 = **${f}**。图片按 Picture 序号挂载：`,
+    firstFrame: (t) => `（**首帧**，钉 ${t} 秒）`,
+    pinnedAt: (t) => `（钉 ${t} 秒）`,
+    seedanceTitle: 'Seedance 提示词',
+    uploadLead: '附件按 @图片 编号依次上传：',
+    styleNote: '视觉风格（画风层）在提交时附加，本文不含。总时长由接口参数控制，正文不写秒数。',
+    noAttachments: '- （无附件）',
+    missingMark: '（缺）',
+    imageRef: (n) => `@图片${n}`,
+    frameLabel: (n) => `分镜图 #${n}`,
+  },
+  en: {
+    h3Title: 'H3 prompt',
+    h3Lead: (f) => `First frame = **${f}**. Attach images by Picture number:`,
+    // en/th 的标注以半角括号开头，模板不加分隔，所以这里自带前导空格（zh 用全角括号不用）
+    firstFrame: (t) => ` (**first frame**, pinned at ${t} s)`,
+    pinnedAt: (t) => ` (pinned at ${t} s)`,
+    seedanceTitle: 'Seedance prompt',
+    uploadLead: 'Upload attachments in @Image order:',
+    styleNote: 'Visual style is attached at submission time and is not part of this file. Total duration is controlled by the API parameter — the text itself carries no timings.',
+    noAttachments: '- (no attachments)',
+    missingMark: ' (missing)',
+    imageRef: (n) => `@Image${n}`,
+    frameLabel: (n) => `storyboard frame #${n}`,
+  },
+  th: {
+    h3Title: 'พรอมต์ H3',
+    h3Lead: (f) => `เฟรมแรก = **${f}** · แนบรูปตามลำดับ Picture:`,
+    firstFrame: (t) => ` (**เฟรมแรก**, ปักที่ ${t} วินาที)`,
+    pinnedAt: (t) => ` (ปักที่ ${t} วินาที)`,
+    seedanceTitle: 'พรอมต์ Seedance',
+    uploadLead: 'อัปโหลดไฟล์แนบตามลำดับ @Image:',
+    styleNote: 'รูปแบบภาพแนบตอนส่งงาน ไม่อยู่ในไฟล์นี้ — ความยาวรวมควบคุมด้วยพารามิเตอร์ของอินเทอร์เฟซ ตัวหนังสือไม่ระบุวินาที',
+    noAttachments: '- (ไม่มีไฟล์แนบ)',
+    missingMark: ' (ขาด)',
+    imageRef: (n) => `@Image${n}`,
+    frameLabel: (n) => `ภาพสตอรีบอร์ด #${n}`,
+  },
+};
+
 export function exportPack(
   board,
   script,
-  { imageExists = () => false, sheetExists = () => false, dir = '.', protocol = 'h3', names = {}, constraints = [] } = {},
+  { imageExists = () => false, sheetExists = () => false, dir = '.', protocol = 'h3', names = {}, constraints = [], lang = null } = {},
 ) {
+  // 界面语言与 render 同一条优先级：显式 lang（CLI 的 --lang）> JSON 顶层 lang 字段 > 'zh'
+  const uiLang = lang ?? board?.lang ?? 'zh';
+  if (!PACK_TEXT[uiLang]) throw new Error('投产包界面语言目前内置 zh / th / en');
+  const pt = PACK_TEXT[uiLang];
+  const zh = uiLang === 'zh';
   const prefix = dir === '.' ? '' : `${dir}/`;
   const expanded = expandScript(script);
   const files = [];
@@ -1057,14 +1115,20 @@ export function exportPack(
           const path = r.kind === 'frame' ? `${prefix}${r.file}` : `${prefix}${seg.id}/ref-${i + 1}.png`;
           const present = r.kind === 'frame' ? imageExists(path) : sheetExists(r.file);
           if (r.kind === 'sheet' && present) copies.push({ file: r.file, to: path });
-          return { ref: `@图片${i + 1}`, label: r.label, kind: r.kind, path, source: r.file, present };
+          return {
+            ref: pt.imageRef(i + 1),
+            // zh 保留 refs 的标注原样（正文声明行也用它）；th/en 只把程序写的「分镜图 #N」
+            // 换成界面语言，设定图标注是内容名/文件名，原样保留
+            label: zh || r.kind !== 'frame' ? r.label : pt.frameLabel(i + 1),
+            kind: r.kind, path, source: r.file, present,
+          };
         });
         const missing = attachments.filter((a) => !a.present).map((a) => a.path);
         missingTotal += missing.length;
         const head = attachments.length
-          ? attachments.map((a) => `- ${a.ref} = ${a.label} → ${a.path.slice(prefix.length + seg.id.length + 1)}${a.present ? '' : '（缺）'}`).join('\n')
-          : '- （无附件）';
-        const md = `# ${seg.id} · Seedance 提示词\n\n附件按 @图片 编号依次上传：\n\n${head}\n\n视觉风格（画风层）在提交时附加，本文不含。总时长由接口参数控制，正文不写秒数。\n\n---\n\n${prompt}\n`;
+          ? attachments.map((a) => `- ${a.ref} = ${a.label} → ${a.path.slice(prefix.length + seg.id.length + 1)}${a.present ? '' : pt.missingMark}`).join('\n')
+          : pt.noAttachments;
+        const md = `# ${seg.id} · ${pt.seedanceTitle}\n\n${pt.uploadLead}\n\n${head}\n\n${pt.styleNote}\n\n---\n\n${prompt}\n`;
         files.push({ path: `${prefix}${seg.id}/seedance.md`, content: md });
         manifest.push({ segment: seg.id, seconds: segSeconds(seg), cuts: (seg.cuts ?? []).length, prompt: `${prefix}${seg.id}/seedance.md`, attachments, missing });
         continue;
@@ -1073,9 +1137,9 @@ export function exportPack(
       // 分隔线以下是 h3Prompt 原样，整段复制就能用
       const starts = cutStarts(seg.cuts);
       const mapping = (seg.cuts ?? [])
-        .map((_, i) => `- Picture ${i + 1} = f${i + 1}.png${i === 0 ? '（**首帧**，钉 0.00 秒）' : `（钉 ${starts[i].toFixed(2)} 秒）`}`)
+        .map((_, i) => `- Picture ${i + 1} = f${i + 1}.png${i === 0 ? pt.firstFrame('0.00') : pt.pinnedAt(starts[i].toFixed(2))}`)
         .join('\n');
-      const promptMd = `# ${seg.id} · H3 提示词\n\n首帧 = **f1.png**。图片按 Picture 序号挂载：\n\n${mapping}\n\n---\n\n${seg.h3Prompt ?? ''}\n`;
+      const promptMd = `# ${seg.id} · ${pt.h3Title}\n\n${pt.h3Lead('f1.png')}\n\n${mapping}\n\n---\n\n${seg.h3Prompt ?? ''}\n`;
       files.push({ path: `${prefix}${seg.id}/prompt.md`, content: promptMd });
       const pictures = (seg.cuts ?? []).map((_, i) => `${prefix}${seg.id}/f${i + 1}.png`);
       const missing = pictures.filter((rel) => !imageExists(rel));
@@ -2055,6 +2119,7 @@ const USAGE = `novel-storyboard.mjs — novel-storyboard skill 的确定性工�
          [--protocol h3|seedance]             h3（默认）：<段号>/prompt.md + f1..fN.png，根部 manifest.json
                                               seedance：<段号>/seedance.md + 附件，根部 seedance-manifest.json
          [--out .]                            输出目录
+         [--lang zh|th|en]                    投产包头部说明与 manifest 附件标注的界面语言（默认 zh；未指定时读 JSON 顶层 lang 字段——与 render 同一条优先级）
          [--frames <dir>]                     从这里把 <段号>/f<切序>.png 拷进投产包；不给就只认包里现成的图
          [--images <dir>]                     Seedance 参考图路径的设定图目录（默认 ./images），找到就拷进包
          [--outline] [--art] [--constraints]  名字与全局约束，同 render
@@ -2294,6 +2359,7 @@ function main(argv) {
       protocol,
       names: namer(ctx),
       constraints: ctx.constraints,
+      lang: cliLangOf(rest, board),
     });
     for (const f of pack.files) {
       mkdirSync(resolve(f.path, '..'), { recursive: true });

@@ -5,8 +5,9 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   CAMERA_MOVES,
@@ -788,6 +789,69 @@ eq(GATE_LOG, '.gates.jsonl', '日志文件名固定');
   eq(pack.copies.length, 0, '分镜路径不拷设定图');
 }
 
+/* ---------------- exportPack 界面语言（th/en 头部，zh 逐字节不变） ---------------- */
+
+{
+  const CJK = /[㐀-鿿]/;
+  const bodyOf = (content) => content.slice(content.indexOf('\n---\n') + 5);
+  const headerOf = (content) => content.slice(0, content.indexOf('\n---\n'));
+
+  // zh 导出逐字节不变：显式 lang zh 与缺省导出完全一致，头部是改动前的中文原文
+  const baseH3 = exportPack(FIXTURE, SCRIPT, { imageExists: () => false });
+  const zhH3 = exportPack(FIXTURE, SCRIPT, { imageExists: () => false, lang: 'zh' });
+  eq(JSON.stringify(zhH3), JSON.stringify(baseH3), '显式 lang zh 与缺省 H3 导出逐字节一致');
+  ok(baseH3.files.find((f) => f.path === 'E01-01/prompt.md').content.startsWith('# E01-01 · H3 提示词'), 'zh 头部保持中文原文');
+  const baseSd = exportPack(FIXTURE, SCRIPT, { protocol: 'seedance' });
+  const zhSd = exportPack(FIXTURE, SCRIPT, { protocol: 'seedance', lang: 'zh' });
+  eq(JSON.stringify(zhSd), JSON.stringify(baseSd), '显式 lang zh 与缺省 Seedance 导出逐字节一致');
+  ok(baseSd.files.find((f) => f.path === 'E01-01/seedance.md').content.startsWith('# E01-01 · Seedance 提示词'), 'zh seedance.md 头部保持中文原文');
+  ok(baseSd.manifest.find((x) => x.segment === 'E01-01').attachments[0].ref === '@图片1', 'zh manifest 附件编号保持 @图片N');
+
+  // 板顶层 lang 字段同样生效（优先级与 render 一致：显式参 > 顶层 lang > zh）
+  const thBoard = { ...clone(FIXTURE), lang: 'th' };
+  ok(exportPack(thBoard, SCRIPT, {}).files.find((f) => f.path === 'E01-01/prompt.md').content.startsWith('# E01-01 · พรอมต์ H3'), 'JSON 顶层 lang 字段决定投产包头部语言');
+
+  // th/en 导出：头部指令行与 manifest 标注无 CJK；分隔线以下正文逐字节不动
+  for (const lang of ['th', 'en']) {
+    for (const protocol of ['h3', 'seedance']) {
+      const pack = exportPack(FIXTURE, SCRIPT, { imageExists: () => false, sheetExists: () => false, dir: 'x', protocol, lang });
+      for (const f of pack.files) {
+        if (!/(prompt|seedance)\.md$/.test(f.path)) continue;
+        ok(f.content.includes('\n---\n'), `${lang} ${protocol} 头部与正文有分隔线（${f.path}）`);
+        ok(!CJK.test(headerOf(f.content)), `${lang} ${protocol} 头部指令行无 CJK（${f.path}）`);
+        ok(f.content.endsWith('\n'), `${lang} ${protocol} 文件以换行收尾（${f.path} trailing newline）`);
+      }
+      const mf = pack.files.find((f) => f.path.endsWith('manifest.json'));
+      ok(!CJK.test(mf.content), `${lang} ${protocol} manifest 标注无 CJK`);
+      const zhRef = protocol === 'h3' ? baseH3 : baseSd;
+      for (const seg of FIXTURE.episodes[0].segments) {
+        const f = `${lang === 'th' ? '' : ''}x/${seg.id}/${protocol === 'h3' ? 'prompt.md' : 'seedance.md'}`;
+        const got = pack.files.find((x) => x.path === f);
+        ok(got && bodyOf(got.content) === bodyOf(zhRef.files.find((x) => x.path === `${seg.id}/${protocol === 'h3' ? 'prompt.md' : 'seedance.md'}`).content), `${lang} ${protocol} 正文与 zh 导出逐字节一致（${seg.id}）`);
+      }
+    }
+  }
+  // th/en 头部内容抽查：标题、首帧说明、附件编号换 @ImageN
+  {
+    const th = exportPack(FIXTURE, SCRIPT, { lang: 'th' });
+    const p = th.files.find((f) => f.path === 'E01-01/prompt.md').content;
+    ok(p.includes('# E01-01 · พรอมต์ H3') && p.includes('เฟรมแรก = **f1.png** · แนบรูปตามลำดับ Picture:'), 'th prompt.md 头部标题与首帧说明是泰文');
+    ok(p.includes('- Picture 1 = f1.png (**เฟรมแรก**, ปักที่ 0.00 วินาที)') && p.includes('- Picture 2 = f2.png (ปักที่ 3.00 วินาที)'), 'th 逐图秒数标注是泰文');
+    const sd = exportPack(FIXTURE, SCRIPT, { protocol: 'seedance', lang: 'th' });
+    const m = sd.files.find((f) => f.path === 'E01-01/seedance.md').content;
+    ok(m.includes('อัปโหลดไฟล์แนบตามลำดับ @Image:') && m.includes('- @Image1 = S02 → ref-1.png (ขาด)'), 'th seedance.md 头部与附件行是泰文、编号换成 @ImageN');
+    ok(m.includes('รูปแบบภาพแนบตอนส่งงาน') && !m.includes('视觉风格'), 'th seedance.md 风格说明是泰文');
+    const en = exportPack(FIXTURE, SCRIPT, { protocol: 'seedance', lang: 'en' });
+    const e = en.files.find((f) => f.path === 'E01-01/seedance.md').content;
+    ok(e.includes('# E01-01 · Seedance prompt') && e.includes('Upload attachments in @Image order:'), 'en seedance.md 头部是英文');
+    ok(e.includes('- @Image2 = C01 → ref-2.png (missing)'), 'en 附件行缺图标注是英文');
+    ok(en.manifest.find((x) => x.segment === 'E01-01').attachments[0].ref === '@Image1', 'en manifest 附件编号 @ImageN');
+  }
+  // 不支持的语言直接报错，不写半个文件
+  assert.throws(() => exportPack(FIXTURE, SCRIPT, { lang: 'fr' }), /zh \/ th \/ en/);
+  ok(true, 'fr 之类不支持的语言导出即抛错');
+}
+
 /* ---------------- validateStoryboard 结构检查 ---------------- */
 
 eq(validateStoryboard(FIXTURE, CTX).length, 0, '样例零违规');
@@ -1033,5 +1097,37 @@ ok(html.includes('老周'), 'html 里 ID 换成名字');
   ok(gateTextOf(thHtml).length > 0 && gateTextOf(enHtml).length > 0, '质量门面板真的渲染了出来');
   ok(!CJK.test(gateTextOf(thHtml)), 'th 报告质量门面板无 CJK（击穿 id 门后）');
   ok(!CJK.test(gateTextOf(enHtml)), 'en 报告质量门面板无 CJK（击穿 id 门后）');
+}
+
+/* ---------------- CLI export 写盘随 --lang 走（Round 4） ---------------- */
+
+{
+  const cli = join(here, 'novel-storyboard.mjs');
+  const board = join(here, '..', 'examples', '渡口-storyboard.json');
+  const script = join(here, '..', 'references', 'test-fixtures', 'upstream', '渡口-script.json');
+  const CJK = /[㐀-鿿]/;
+  const thOut = mkdtempSync(join(tmpdir(), 'sb-export-th-'));
+  const enOut = mkdtempSync(join(tmpdir(), 'sb-export-en-'));
+  try {
+    const th = spawnSync(process.execPath, [cli, 'export', board, '--script', script, '--out', thOut, '--lang', 'th'], { encoding: 'utf8' });
+    eq(th.status, 0, 'export --lang th ทำงานสำเร็จผ่าน CLI');
+    ok(th.stdout.includes('แพ็กผลิต') && !CJK.test(th.stdout), 'export --lang th 的 CLI 输出无 CJK');
+    const thMd = readFileSync(join(thOut, 'E01-01', 'prompt.md'), 'utf8');
+    ok(thMd.startsWith('# E01-01 · พรอมต์ H3'), 'CLI 写盘的 prompt.md 头部是泰文');
+    const thHeader = thMd.slice(0, thMd.indexOf('\n---\n'));
+    ok(!CJK.test(thHeader), 'CLI 写盘的 prompt.md 头部无 CJK');
+
+    const en = spawnSync(process.execPath, [cli, 'export', board, '--script', script, '--protocol', 'seedance', '--out', enOut, '--lang', 'en'], { encoding: 'utf8' });
+    eq(en.status, 0, 'English seedance export succeeds through the CLI');
+    ok(en.stdout.includes('production pack') && !CJK.test(en.stdout), 'English export CLI output has no Chinese UI text');
+    const enMd = readFileSync(join(enOut, 'E01-01', 'seedance.md'), 'utf8');
+    ok(enMd.startsWith('# E01-01 · Seedance prompt'), 'CLI 写盘的 seedance.md 头部是英文');
+    ok(!CJK.test(enMd.slice(0, enMd.indexOf('\n---\n'))), 'CLI 写盘的 seedance.md 头部无 CJK');
+    const manifest = JSON.parse(readFileSync(join(enOut, 'seedance-manifest.json'), 'utf8'));
+    ok(!CJK.test(JSON.stringify(manifest)), 'English seedance manifest labels carry no CJK');
+  } finally {
+    rmSync(thOut, { recursive: true, force: true });
+    rmSync(enOut, { recursive: true, force: true });
+  }
 }
 console.log(`✓ ${passed} 项自测全部通过`);
