@@ -4,7 +4,9 @@
 //   node scripts/selftest.mjs
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -20,6 +22,7 @@ import {
   detectChapters,
   fmtEps,
   gateReport,
+  isSkippedGate,
   primarySceneCap,
   renderHtml,
   renderMarkdown,
@@ -30,6 +33,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = JSON.parse(readFileSync(join(here, '..', 'examples', '渡口-outline.json'), 'utf8'));
+const SCRIPT = join(here, 'novel-outline.mjs');
 
 let passed = 0;
 function ok(cond, msg) {
@@ -754,6 +758,99 @@ ok(enMd.includes('**[Hook]**') && !enMd.includes('**【钩子】**'), 'EN MD 钩
   const o = clone();
   o.contentLang = 'de';
   ok(validateOutline(o).some((x) => x.includes('contentLang')), '不支持的内容语言被结构校验拦截');
+}
+
+/* ---------------- 单集大纲：major-early 跳过（Round 3 修复一） ---------------- */
+
+{
+  // 最小单集泰文大纲：1 个主场景 + 3 个角色 + 1 件道具 + 1 个爽点，
+  // 其余 13 道门全部真正通过，只有 major-early 因「只有 1 集」跳过。
+  const single = {
+    source: 'บ้านพักตากอากาศ',
+    lang: 'th',
+    contentLang: 'th',
+    params: { episodes: 1, minutesPerEpisode: 2, genre: 'ระทึกขวัญ', adaptMode: '抽核' },
+    adaptation: {
+      core: 'หอพักสูงกลางฝน คนทุกคนมีความลับ',
+      keep: [{ what: 'หอพักสูงและฝนตกหนัก', why: 'ฉากเดียวรวมทุกคน', evidence: 'ฝนกระแทกหน้าต่างราวกับใครสักคนกำลังเรียกหา' }],
+      cut: [{ what: 'เมืองภายนอก', why: 'เวลาสั้นเกินกว่าจะเดินทาง' }],
+      merge: [{ what: 'พ่อบ้านกับยามรวมเป็นคนเดียว', why: 'ฟังก์ชันเดียวกันไม่ต้องมีสองหน้า' }],
+      risks: [{ what: 'ฉากเดียวอาจน่าเบื่อ', plan: 'มีเหตุการณ์ภายนอกแทรกทุกช่วง' }],
+    },
+    characters: [
+      { id: 'C01', name: 'มาลี', role: 'พนักงานต้อนรับ', arc: 'จากการกลัวไปสู่การเผชิญหน้า', from: ['ต้นฉบับ'], tier: 'lead' },
+      { id: 'C02', name: 'ธีร์', role: 'แขกปริศนา', arc: 'ความลับเปิดเผยตอนจบ', from: ['ต้นฉบับ'], tier: 'lead' },
+      { id: 'C03', name: 'สมชาย', role: 'พ่อบ้าน', tier: 'functional', role: 'ดูแลหอพัก', from: ['ต้นฉบับ'] },
+    ],
+    scenes: [{ id: 'S01', name: 'ห้องโถง', primary: true, reusePlan: 'ใช้มุมกล้องเดิมเปลี่ยนเป็นฉากหลังเวลาผ่านไป' }],
+    props: [{ id: 'P01', name: 'กุญแจเก่า', function: 'กุญแจที่เปิดห้องลับ', beatIds: ['B01'] }],
+    beats: [{ id: 'B01', type: 'จุดพีค', weight: 'minor', episode: 1, setup: 'กุญแจหาย', payoff: 'พบกุญแจในตู้เสื้อผ้า' }],
+    episodes: [
+      {
+        ep: 1,
+        synopsis: 'หมอกหนาทั้งคืน มาลีเดินตรวจห้องตามทางเดินยาว ธีร์มาเข้าพักพร้อมหมอก สมชายถือผ้าห่มเดินผ่านไปเงียบๆ ทุกคนทำหน้าที่ของตัวเอง',
+        hook: 'กุญแจห้องลับหายไป',
+        suspense: 'ธีร์จ้องมองตู้เสื้อผ้าตัวเก่า',
+        sceneIds: ['S01'],
+        characterIds: ['C01', 'C02', 'C03'],
+        propIds: ['P01'],
+        crowdPlan: 'แยกเป็นการถ่ายคนละมุม ไม่จัดทุกคนในเฟรมเดียว',
+        warnings: [],
+      },
+    ],
+  };
+
+  const g = gate(single, 'major-early');
+  ok(g.ok, '单集大纲 major-early 不再失败');
+  eq(g.detail, '只有 1 集，不适用', '跳过原因明说，不静默');
+  ok(isSkippedGate(g), 'major-early 识别为跳过（不是静默通过）');
+  eq(gateReport(single).length, 14, '跳过不等于少一道门——门数仍是 14');
+  eq(validateOutline(single).length, 0, '单集大纲全量校验通过');
+  eq(validateOutline(single, 'beats').length, 0, '单集大纲 beats 档也通过');
+
+  // zh 报告：门行带跳过原因，gsum 带跳过计数（fixture 本身是 th，须显式指定界面语言）
+  const zhHtml = renderHtml(single, 'zh');
+  ok(!/第 1 集有钩子<small>/.test(zhHtml), 'zh 通过门不显示多余 detail');
+  ok(zhHtml.includes('只有 1 集，不适用'), 'zh 报告显示跳过原因');
+  ok(zhHtml.includes('质量门 13 / 13（跳过 1 项）'), 'zh 通过计数把跳过排除在分母外');
+  ok(zhHtml.includes('全部通过 · （跳过 1 项）'), 'zh 总结行带跳过计数');
+  ok(renderMarkdown(single, 'zh').includes('- ✅ 大爆点不在最后一集才首次出现 — 只有 1 集，不适用'), 'zh Markdown 门行明说跳过');
+
+  // th / en 报告：跳过原因本地化，pill 显示 13/13 (1 skipped)
+  const thHtml = renderHtml(single, 'th');
+  ok(thHtml.includes('มีตอนเดียว จึงไม่ต้องตรวจข้อนี้'), 'th 跳过原因本地化');
+  ok(thHtml.includes('ด่านคุณภาพ 13 / 13 (ข้าม 1 ข้อ)'), 'th pill 显示 13/13 (1 skipped)');
+  const enHtml = renderHtml(single, 'en');
+  ok(enHtml.includes('Single-episode outline — not applicable'), 'en 跳过原因本地化');
+  ok(enHtml.includes('Gates 13 / 13 (1 skipped)'), 'en pill 显示 13/13 (1 skipped)');
+  ok(enHtml.includes('All passed') && enHtml.includes(' (1 skipped)'), 'en 总结行带跳过计数');
+
+  // CLI checkup：三语都报跳过，且全部通过时退出码 0
+  const tmp = join(tmpdir(), `outline-single-${process.pid}.json`);
+  writeFileSync(tmp, JSON.stringify(single), 'utf8');
+  for (const [lang, passLine, reason] of [
+    ['zh', '✓ 全部通过（跳过 1 项）', '只有 1 集，不适用'],
+    ['th', '✓ ผ่านทั้งหมด (ข้าม 1 ข้อ)', 'มีตอนเดียว จึงไม่ต้องตรวจข้อนี้'],
+    ['en', '✓ All passed (1 skipped)', 'Single-episode outline — not applicable'],
+  ]) {
+    const r = spawnSync(process.execPath, [SCRIPT, 'checkup', tmp, '--lang', lang]);
+    ok(r.status === 0, `单集大纲 checkup(${lang}) 退出码 0`);
+    ok(r.stdout.toString().includes(passLine), `checkup(${lang}) 总结带跳过计数`);
+    ok(r.stdout.toString().includes(reason), `checkup(${lang}) 门行显示本地化跳过原因`);
+  }
+  rmSync(tmp, { force: true });
+
+  // 总集数 ≥ 2 时判定原样：2 集大纲 major 落在末集 → 照常失败
+  const two = structuredClone(single);
+  two.params.episodes = 2;
+  two.beats[0].weight = 'major';
+  two.beats[0].episode = 2;
+  two.episodes[0].sceneIds = ['S01', 'S01'];
+  two.episodes.push({ ...structuredClone(two.episodes[0]), ep: 2, sceneIds: ['S01'], characterIds: ['C01', 'C02'] });
+  const g2 = gate(two, 'major-early');
+  ok(!g2.ok, '2 集大纲 major 在末集照常失败');
+  ok(g2.detail.includes('最早在第 2 集'), '2 集失败 detail 保持原文');
+  ok(!isSkippedGate(g2), '失败门不算跳过');
 }
 
 eq(DEFAULT_PER_VOLUME, 15, '默认每卷 15 章');

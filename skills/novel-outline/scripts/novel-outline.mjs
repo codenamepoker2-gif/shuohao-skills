@@ -300,14 +300,20 @@ export function gateReport(outline) {
   // G5 第 1 集有钩子
   add('ep1-hook', '第 1 集有钩子', eps.length > 0 && thText(eps[0]?.hook), '');
 
-  // G6 大爆点不能到最后一集才第一次出现
+  // G6 大爆点不能到最后一集才第一次出现。
+  // 只有 1 集时这条规则没有意义（首集即末集，条件永远为假）——明说跳过，
+  // 不判失败也不静默通过。总集数 ≥ 2 的判定一行不动。
   const majors = beats.filter((b) => (b?.weight ?? 'minor') === 'major').map((b) => b.episode);
-  add(
-    'major-early',
-    '大爆点不在最后一集才首次出现',
-    majors.length > 0 && Math.min(...majors) < total,
-    majors.length ? `最早在第 ${Math.min(...majors)} 集` : '没有 major 爽点',
-  );
+  if (total === 1) {
+    add('major-early', '大爆点不在最后一集才首次出现', true, '只有 1 集，不适用');
+  } else {
+    add(
+      'major-early',
+      '大爆点不在最后一集才首次出现',
+      majors.length > 0 && Math.min(...majors) < total,
+      majors.length ? `最早在第 ${Math.min(...majors)} 集` : '没有 major 爽点',
+    );
+  }
 
   // G7 每集三栏齐全（钩子/悬念必填）
   const incomplete = eps.filter((e) => !EP_TEXT_FIELDS.every((f) => thText(e?.[f])));
@@ -663,6 +669,15 @@ const GATE_SKIPS_EN = {
     '未提供 script.json，本门跳过（视为通过）': 'script.json not provided — gate skipped (treated as passing)',
     '未提供 outline/cast，本门跳过（视为通过）': 'outline/cast not provided — gate skipped (treated as passing)',
     '未提供 cast.json，本门跳过（视为通过）': 'cast.json not provided — gate skipped (treated as passing)',
+    '只有 1 集，不适用': 'Single-episode outline — not applicable',
+};
+const GATE_SKIPS_TH = {
+    '未提供 outline.json，本门跳过（视为通过）': 'ไม่ได้รับ outline.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
+    '未提供 art.json，本门跳过（视为通过）': 'ไม่ได้รับ art.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
+    '未提供 script.json，本门跳过（视为通过）': 'ไม่ได้รับ script.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
+    '未提供 outline/cast，本门跳过（视为通过）': 'ไม่ได้รับ outline/cast — ข้ามด่านนี้ (นับเป็นผ่าน)',
+    '未提供 cast.json，本门跳过（视为通过）': 'ไม่ได้รับ cast.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
+    '只有 1 集，不适用': 'มีตอนเดียว จึงไม่ต้องตรวจข้อนี้',
 };
 /** 报告里的门文案：英文界面取映射，未命中或中文界面回落原文。 */
 const gateText = (g, lang) => {
@@ -671,7 +686,8 @@ const gateText = (g, lang) => {
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
   const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
-  let detail = lang === 'en' ? (GATE_SKIPS_EN[g.detail] ?? g.detail) : g.detail;
+  const skipMap = lang === 'th' ? GATE_SKIPS_TH : GATE_SKIPS_EN;
+  let detail = lang === 'zh' ? g.detail : (skipMap[g.detail] ?? g.detail);
   if (lang === 'th') {
     detail = String(detail)
       .replace(/^缺：/, 'ขาด: ')
@@ -699,6 +715,11 @@ const gateText = (g, lang) => {
   return { label, detail };
 };
 
+/* 跳过的门：通过但明说「跳过/不适用」。跳过不计入通过数，也不计入总数——
+ * 这样通过率的分母是真正被检查过的门（例如 13/13（跳过 1 项）而不是 14/14）。
+ * 跳过必须显式出现在 detail 里（「跳过要明说，不静默」）。 */
+export const isSkippedGate = (g) => g.ok && /跳过|不适用/.test(String(g.detail ?? ''));
+
 const I18N = {
   zh: {
     langCode: 'zh',
@@ -712,6 +733,7 @@ const I18N = {
     gatesPass: '全部通过',
     gatesFail: (n) => `${n} 项未过`,
     gatePill: (okN, total) => `质量门 ${okN} / ${total}`,
+    gateSkip: (n) => `（跳过 ${n} 项）`,
     sections: {
       decisions: '关键决策', rhythm: '爽点节奏', episodes: '分集梗概',
       episodesOverview: '分集概览', matrix: '每集调度矩阵',
@@ -809,6 +831,7 @@ const I18N = {
     gatesPass: 'All passed',
     gatesFail: (n) => `${n} failed`,
     gatePill: (okN, total) => `Gates ${okN} / ${total}`,
+    gateSkip: (n) => ` (${n} skipped)`,
     sections: {
       decisions: 'Key decisions', rhythm: 'Beat rhythm', episodes: 'Per-episode synopses',
       episodesOverview: 'Episode overview', matrix: 'Dispatch matrix',
@@ -904,6 +927,7 @@ const I18N = {
     paramsLine: (p) => `${p.episodes} ตอน × ${p.minutesPerEpisode} นาที · ${p.genre} · รูปแบบ ${ADAPT_MODE_LABELS.th[p.adaptMode] ?? p.adaptMode}`,
     exportJson: 'ส่งออก JSON', gates: 'ด่านคุณภาพ', gatesPass: 'ผ่านทั้งหมด',
     gatesFail: (n) => `ไม่ผ่าน ${n} ข้อ`, gatePill: (okN, total) => `ด่านคุณภาพ ${okN} / ${total}`,
+    gateSkip: (n) => ` (ข้าม ${n} ข้อ)`,
     sections: {
       decisions: 'การตัดสินใจหลัก', rhythm: 'จังหวะจุดพีค', episodes: 'เรื่องย่อรายตอน',
       episodesOverview: 'ภาพรวมรายตอน', matrix: 'ตารางจัดสรรรายตอน', sceneOverview: 'ภาพรวมฉาก',
@@ -994,7 +1018,11 @@ export function renderMarkdown(outline, lang) {
 
   // 质量门放最前面——先看有没有病，再看内容
   out.push(`## ${t.gates}`, '');
-  for (const g of gates) out.push(`- ${g.ok ? '✅' : '❌'} ${gateText(g, t.langCode).label}${!g.ok && g.detail ? ` — ${gateText(g, t.langCode).detail}` : ''}`);
+  for (const g of gates) {
+    const gt = gateText(g, t.langCode);
+    // 失败的门和明说跳过的门都要带 detail；通过的门不带（避免和数字互相矛盾）
+    out.push(`- ${g.ok ? '✅' : '❌'} ${gt.label}${(!g.ok || isSkippedGate(g)) && gt.detail ? ` — ${gt.detail}` : ''}`);
+  }
   out.push('');
 
   out.push(`## ${t.mdSec(1, t.sections.adaptation)}`, '', `**${t.core}**${t.pairSep}${ad.core}`, '');
@@ -1198,6 +1226,7 @@ export function renderHtml(outline, lang) {
   const assets = computeAssets(outline);
   const gates = gateReport(outline);
   const failed = gates.filter((g) => !g.ok);
+  const skipped = gates.filter((g) => isSkippedGate(g));
   const total = params.episodes;
   const beatsOf = (ep) => beats.filter((b) => b.episode === ep);
 
@@ -1353,13 +1382,15 @@ export function renderHtml(outline, lang) {
 </div>`;
 
   // ---- 质量门 ----
+  // 失败的门和明说跳过的门都带 detail（跳过也要在 HTML 报告里看得见）。
   const gateList = `<ul class="gate">
   ${gates
-    .map(
-      (g) => `<li class="${g.ok ? 'ok' : 'bad'}"><span class="m">${g.ok ? '✓' : '✗'}</span><span>${esc(gateText(g, t.langCode).label)}${
-        !g.ok && g.detail ? `<small>${esc(g.detail)}</small>` : ''
-      }</span></li>`,
-    )
+    .map((g) => {
+      const shown = gateText(g, t.langCode);
+      return `<li class="${g.ok ? 'ok' : 'bad'}"><span class="m">${g.ok ? '✓' : '✗'}</span><span>${esc(shown.label)}${
+        (!g.ok || isSkippedGate(g)) && shown.detail ? `<small>${esc(shown.detail)}</small>` : ''
+      }</span></li>`;
+    })
     .join('\n  ')}
 </ul>`;
 
@@ -1586,7 +1617,7 @@ h3.sub{font:500 12px/1 var(--sans);letter-spacing:.18em;color:var(--seal);margin
   <h1>${esc(source)}</h1>
   <span class="sub">${esc(t.kicker)} · ${esc(t.paramsLine(params))}</span>
   <span class="right">
-    <span class="gatepill ${failed.length ? 'fail' : 'pass'}">${failed.length ? '✗' : '✓'} ${esc(t.gatePill(gates.length - failed.length, gates.length))}</span>
+    <span class="gatepill ${failed.length ? 'fail' : 'pass'}">${failed.length ? '✗' : '✓'} ${esc(t.gatePill(gates.length - skipped.length - failed.length, gates.length - skipped.length))}${skipped.length ? esc(t.gateSkip(skipped.length)) : ''}</span>
     <button class="expo" data-name="${esc(slug(source))}-outline.json">${esc(t.exportJson)}</button>
   </span>
 </header>
@@ -1657,7 +1688,7 @@ ${scards}
 <section id="sec-gates">
   ${secHead('09', t.sections.gates, undefined)}
   ${gateList}
-  <p class="gsum">${failed.length ? `<b>${esc(t.gatesFail(failed.length))}</b>` : esc(t.gatesPass)}</p>
+  <p class="gsum">${failed.length ? `<b>${esc(t.gatesFail(failed.length))}</b>` : esc(t.gatesPass)}${skipped.length ? ` · ${esc(t.gateSkip(skipped.length))}` : ''}</p>
 </section>
 
 <p class="foot">${esc(t.colophon)}</p>
@@ -1718,13 +1749,13 @@ chunk 选项：
 
 const CLI_TEXT = {
   zh: { usage: USAGE, failed: (n, stage) => `✗ ${n} 处违规（stage=${stage}）：\n`, passed: (stage) => `✓ 通过校验（stage=${stage}）`,
-    summary: (n) => n ? `\n✗ ${n} 项未过` : '\n✓ 全部通过' },
+    summary: (n, skipped = 0) => (n ? `\n✗ ${n} 项未过` : '\n✓ 全部通过') + (skipped ? `（跳过 ${skipped} 项）` : '') },
   th: { usage: `novel-outline.mjs — เครื่องมือตรวจและเรนเดอร์โครงเรื่อง\n\n  chunk <book.txt> <workdir> [--per-volume n]\n  validate <outline.json> [--stage skeleton|beats|full] [--lang th]\n  checkup <outline.json> [--lang th]\n  render <outline.json> [--html|--md] [--lang zh|th|en]\n  assets <outline.json>\n  slug <name>`,
     failed: (n, stage) => `✗ พบข้อผิดพลาด ${n} รายการ (stage=${stage}):\n`, passed: (stage) => `✓ ผ่านการตรวจสอบ (stage=${stage})`,
-    summary: (n) => n ? `\n✗ ไม่ผ่าน ${n} ข้อ` : '\n✓ ผ่านทั้งหมด' },
+    summary: (n, skipped = 0) => (n ? `\n✗ ไม่ผ่าน ${n} ข้อ` : '\n✓ ผ่านทั้งหมด') + (skipped ? ` (ข้าม ${skipped} ข้อ)` : '') },
   en: { usage: `novel-outline.mjs — deterministic outline tools\n\n  chunk <book.txt> <workdir> [--per-volume n]\n  validate <outline.json> [--stage skeleton|beats|full] [--lang en]\n  checkup <outline.json> [--lang en]\n  render <outline.json> [--html|--md] [--lang zh|th|en]\n  assets <outline.json>\n  slug <name>`,
     failed: (n, stage) => `✗ ${n} validation error(s) (stage=${stage}):\n`, passed: (stage) => `✓ Validation passed (stage=${stage})`,
-    summary: (n) => n ? `\n✗ ${n} gate(s) failed` : '\n✓ All passed' },
+    summary: (n, skipped = 0) => (n ? `\n✗ ${n} gate(s) failed` : '\n✓ All passed') + (skipped ? ` (${skipped} skipped)` : '') },
 };
 const cliFor = (lang) => {
   if (!CLI_TEXT[lang]) throw new Error('界面语言必须是 zh / th / en');
@@ -1808,10 +1839,11 @@ function main(argv) {
     const gates = gateReport(outline);
     for (const g of gates) {
       const shown = gateText(g, cliLang);
-      console.log(`${g.ok ? '✓' : '✗'} ${shown.label}${!g.ok && shown.detail ? ` — ${shown.detail}` : ''}`);
+      console.log(`${g.ok ? '✓' : '✗'} ${shown.label}${(!g.ok || isSkippedGate(g)) && shown.detail ? ` — ${shown.detail}` : ''}`);
     }
     const failed = gates.filter((g) => !g.ok).length;
-    console.log(cli.summary(failed));
+    const skipped = gates.filter((g) => isSkippedGate(g)).length;
+    console.log(cli.summary(failed, skipped));
     if (failed) process.exit(1);
     return;
   }
