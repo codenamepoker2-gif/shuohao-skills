@@ -131,3 +131,50 @@ Round 3 commits (local on `main`, author `codenamepoker2-gif`, **not pushed — 
 
 - `c300ce9` Outline: single-episode outlines skip major-early instead of failing
 - `df3737a` Outline: localize every gate detail for Thai and English reports
+
+## Round 4 (2026-09-27)
+
+Round 4 closes the single fix from `.glm-brief-4.md`: the exported production pack (H3 and Seedance) addressed its human operator in Chinese regardless of UI language — `# E01-01 · H3 提示词`, `首帧 = **f1.png**。图片按 Picture 序号挂载：`, `Picture 1 = f1.png（**首帧**，钉 0.00 秒）`, `@图片1`, `（缺）`. No open questions came up; nothing needed escalation.
+
+### What was done (`fbdb230`)
+
+`exportPack` now resolves the pack's UI language with the same priority as `render` — `--lang` > JSON top-level `lang` field > `zh` (CLI passes `cliLangOf(rest, board)`; the board's own `lang` field works without any flag, and `--lang fr` is rejected before a single file is written). A `PACK_TEXT` table (zh / en / th) carries every operator-facing string:
+
+- `prompt.md` / `seedance.md` titles (`# E01-01 · พรอมต์ H3`, `# E01-01 · Seedance prompt`)
+- the Picture/attachment instruction lines (`เฟรมแรก = **f1.png** · แนบรูปตามลำดับ Picture:`, `Upload attachments in @Image order:`)
+- per-image timing marks (`(**เฟรมแรก**, ปักที่ 0.00 วินาที)`, `(pinned at 3.00 s)`)
+- the style/timing note, the missing mark (` (ขาด)` / ` (missing)`), the empty-attachments line
+- manifest attachment tokens (`@图片N` ↔ `@ImageN`) and the program-written frame label (`分镜图 #N` ↔ `storyboard frame #N` / `ภาพสตอรีบอร์ด #N`)
+
+**The prompt body below the `---` separator is untouched** — it is what gets sent to the video model and keeps following the existing `promptLang` / `contentLang` rules. Two content exceptions stay verbatim in every UI language, by design: the reference-sheet label (the sheet file name derives from that content name, so it is a filename, not UI text) and the story's dialogue.
+
+**zh byte-identity is proven, not assumed:** the pre-change script (`git show HEAD:…`) and the new script both exported the 渡口 example through the real CLI into identically named directories for both protocols; `diff -r` reports the pack files *and* manifests identical. The zh table also holds the exact previous strings, and the selftest adds `JSON.stringify` deep-equality between the default and explicit-`zh` exports.
+
+### Audit — export README and the root assembler zip notes
+
+- **Skill READMEs (zh/en/th) + SKILL.md:** now document the rule — the pack's human-facing parts follow the report UI language, the body below `---` does not, sheet labels stay as content names. Selftest counts refreshed (346 → 536).
+- **Root assembler (`scripts/report.mjs`):** audited — it has no export/zip-related output of its own (its CLI text was already localized in Round 1; 113 assertions pass). Nothing to change.
+- **Root README demo-workdir section (the zip-packing convention, `manifest.json` + `E01-0x/`):** audited — it documents ASCII paths and the zh-default behavior, which is unchanged; no leak.
+
+### Guarding tests (349 → 536, +187)
+
+- zh byte-identity: explicit `lang: 'zh'` export deep-equals the default export, both protocols; zh headers/tokens unchanged
+- board-level `lang: 'th'` produces Thai headers without any flag (mirrors the live demo-th board)
+- for th and en, both protocols: every prompt.md/seedance.md header (above `---`) is CJK-free; every manifest is CJK-free; every segment's body below `---` is byte-equal to the zh export's body
+- content spot-checks: Thai/English titles, leads, timing marks, `@ImageN` tokens, missing marks
+- invalid language (`fr`) throws before writing
+- CLI end-to-end: `export --lang th` (H3) and `--protocol seedance --lang en` write packs to a temp dir with translated headers, CJK-free CLI output, and a CJK-free manifest; temp dirs cleaned up in `finally`
+
+### Final counts
+
+```sh
+for f in skills/*/scripts/selftest.mjs; do node "$f"; done
+node scripts/report-selftest.mjs
+```
+
+character-refs 248, novel-art 173, novel-characters 366, novel-outline 378, novel-script 187, novel-storyboard **536** — all passing; report assembler 113. Total **2,001** assertions, up from 1,814 at the end of Round 3 (+187), with zero assertions deleted or loosened (selftest diff removes only one import line, rewritten as an expanded import).
+
+Round 4 commits (local on `main`, author `codenamepoker2-gif`, **not pushed — the captain pushes**):
+
+- `fbdb230` Storyboard: localize export pack headers and manifest labels for th/en
+- *(this commit)* Docs: add Round 4 section to I18N-TH-REPORT.md
