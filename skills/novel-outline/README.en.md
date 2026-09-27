@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-outline
@@ -30,7 +31,7 @@ The skeleton (cut lines / merge characters / place beats) ships as a **quick dra
 
 ## The report
 
-Reports render with a Chinese UI by default; pass `--lang en` for a fully English report (or set a top-level `lang` field in `outline.json` — the flag wins). The UI and the quality-gate labels are translated; data content — beat types, synopses, names — stays exactly as authored, and so do the detail strings of a failing gate. In English mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored.
+Reports ship with Chinese, Thai, and English UI. Chinese is the default; pass `--lang th` or `--lang en`, or set top-level `lang` (the flag wins). Set `contentLang` to `zh`, `th`, or `en` so dialogue and production-risk gates use the story language; omitted values preserve the upstream `zh` behavior.
 
 ```bash
 node scripts/novel-outline.mjs render outline.json --html --lang en > outline-report.html
@@ -47,7 +48,7 @@ A single-page, 1600px-wide review document — everything laid flat and Cmd+F-ab
 - **Asset conversion**: cast tiers, scene environments, and production risks converted into prep workload — all computed
 - **Quality gates**: header badge, a failure banner when anything fails, and the full ✓/✗ list at the end — baked in by the script
 - **Export JSON** downloads `outline.json` verbatim — edit and feed it straight back into `render` / `validate`
-- **Built-in Chinese and English UI** — Chinese by default, `--lang en` for English
+- **Built-in Chinese, Thai, and English UI** — Chinese by default; `--lang th` or `--lang en` switches it
 - All graphics are inline SVG/CSS with a validator-checked palette; zero external resources, opens offline
 
 ## Checkup mode
@@ -77,6 +78,6 @@ novel-outline owns adaptation structure (cutting, merging, beat placement, episo
 node scripts/selftest.mjs
 ```
 
-249 assertions — chunking, validation, gate-defeating cases, asset aggregation, rendering (both UI languages), export. No model calls, runs in about a second.
+260 assertions — chunking (including Thai chapter headings), validation, gate-defeating cases, Thai content, asset aggregation, rendering in all three UI languages, and export. No model calls; runs in about a second.
 
 **Only tested on macOS + Node 24.**

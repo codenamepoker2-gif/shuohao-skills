@@ -686,7 +686,53 @@ ok(enMd.includes('**[Hook]**') && !enMd.includes('**【钩子】**'), 'EN MD 钩
   } catch (e) {
     threw = e.message;
   }
-  ok(threw.includes('zh / en'), '非法语言抛错——界面只内置 zh / en');
+  ok(threw.includes('zh / th / en'), '非法语言抛错——界面只内置 zh / th / en');
+}
+
+/* ---------------- ภาษาไทย：界面 + 内容门 ---------------- */
+
+{
+  const o = clone();
+  o.lang = 'th';
+  o.contentLang = 'th';
+  o.source = 'คืนที่ท่าเรือ';
+  o.adaptation.core = 'หญิงสาวกลับบ้านและเปิดเผยความจริงของครอบครัว';
+  o.adaptation.keep.forEach((x) => { x.what = 'แก่นความสัมพันธ์'; x.why = 'เป็นหัวใจของเรื่อง'; });
+  o.characters.forEach((c, i) => {
+    c.name = `ตัวละคร${i + 1}`;
+    c.role = 'ผู้เกี่ยวข้องกับความลับ';
+    if (c.tier !== 'functional') c.arc = 'เรียนรู้ที่จะยอมรับความจริง';
+    c.from = [`บทบาทเดิม${i + 1}`];
+  });
+  o.scenes.forEach((s, i) => { s.name = `ฉาก${i + 1}`; if (s.reusePlan) s.reusePlan = 'ดัดแปลงจากฉากหลัก'; });
+  o.beats.forEach((b, i) => { b.type = `จุดพีค${i + 1}`; b.setup = 'ปูความลับ'; b.payoff = 'เปิดเผยความจริง'; });
+  o.episodes.forEach((e, i) => {
+    e.synopsis = `ตัวละครค้นหาเบาะแสในตอนที่ ${i + 1}`;
+    e.hook = 'พบหลักฐานใหม่';
+    e.suspense = 'ความจริงยังไม่ครบ';
+    e.warnings = [];
+    if (e.crowdPlan) e.crowdPlan = 'แบ่งเป็นภาพเดี่ยวและภาพโต้ตอบ';
+  });
+  eq(validateOutline(o).length, 0, '大纲全量泰文内容通过校验');
+  const th = renderHtml(o);
+  ok(th.includes('<html lang="th">'), '泰文报告声明 lang=th');
+  ok(th.includes('ส่งออก JSON'), '泰文报告有自然泰文导出按钮');
+  ok(th.includes('การตัดสินใจหลัก') && th.includes('ด่านคุณภาพ'), '泰文报告区块标题完整');
+  ok(th.includes('ตัวละครหลัก 1–5 คน'), '泰文质量门标签翻译且阈值保留');
+  ok(!th.includes('导出 JSON') && !th.includes('Key decisions'), '泰文界面不混入中英文标题');
+  ok(renderMarkdown(o).includes('1. แนวทางดัดแปลง'), '泰文 Markdown 使用泰文章节标题');
+
+  o.episodes[0].synopsis = 'ฝนตกหนักที่ท่าเรือ';
+  ok(!gate(o, 'risk-flag').ok, '泰文雨戏会触发生成难点门');
+  o.episodes[0].warnings = ['ฝนในฉาก'];
+  ok(gate(o, 'risk-flag').ok, '泰文预警标签能满足生成难点门');
+  o.episodes[0].hook = 'เขาพูดว่า “กลับบ้าน”';
+  ok(!gate(o, 'no-dialogue').ok, '泰文引号对白被叙述体门拦截');
+}
+{
+  const o = clone();
+  o.contentLang = 'de';
+  ok(validateOutline(o).some((x) => x.includes('contentLang')), '不支持的内容语言被结构校验拦截');
 }
 
 eq(DEFAULT_PER_VOLUME, 15, '默认每卷 15 章');

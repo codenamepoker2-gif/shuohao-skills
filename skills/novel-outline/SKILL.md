@@ -126,7 +126,7 @@ node {baseDir}/scripts/novel-outline.mjs render <书名>-outline.json --md   > <
 node {baseDir}/scripts/novel-outline.mjs render <书名>-outline.json --html > outline-report.html
 ```
 
-报告界面默认中文；用户要英文界面就加 `--lang en`（或在 outline.json 顶层写 `lang` 字段，`--lang` 优先）。只翻译界面文案，数据内容（爽点类型、梗概、质量门文案）原样出。
+报告界面内置中、泰、英三语；用户要切界面就加 `--lang th` 或 `--lang en`（或在 outline.json 顶层写 `lang` 字段，`--lang` 优先）。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`）。只翻译界面文案，数据内容（爽点类型、梗概、质量门文案）原样出。
 
 report 里自带：KPI 带、关键决策（拍板三件事，大爆点列表和角色位统计自动算）、爽点时间轴（空档标在轴上，超阈值变红）、每集调度矩阵、场景概览卡、资产量折算、质量门（✓/✗ 烘进页面，未过弹病灶横幅）、导出 JSON 按钮（下载的就是 outline.json 原样）。
 

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ADAPT_MODES = ['忠实', '抽核', '借壳'];
 export const BEAT_WEIGHTS = ['major', 'minor'];
+export const CONTENT_LANGS = ['zh', 'th', 'en'];
 
 /*
  * 角色分档。一刀切的「有名字角色 ≤ 6」混淆了两件事：观众要记住谁、
@@ -68,14 +69,35 @@ export function primarySceneCap(episodes) {
  * 宁可多报不可漏报——预警清单的意义就是拍摄前有人看过一眼。
  */
 export const RISK_PATTERNS = {
-  雨戏: /雨/,
-  肢体接触: /吻|拥抱|相拥|牵手|贴身|扭打|搂/,
-  人群: /人群|围观|众人|满堂|满座|集市|人山/,
-  手部特写: /手部|指尖|十指|特写.{0,4}手/,
+    雨戏: /雨/,
+    肢体接触: /吻|拥抱|相拥|牵手|贴身|扭打|搂/,
+    人群: /人群|围观|众人|满堂|满座|集市|人山/,
+    手部特写: /手部|指尖|十指|特写.{0,4}手/,
+};
+export const RISK_PATTERNS_BY_LANG = {
+  zh: RISK_PATTERNS,
+  th: {
+    ฝนในฉาก: /ฝน|พายุ/,
+    สัมผัสร่างกาย: /จูบ|กอด|จับมือ|ต่อสู้|ปล้ำ/,
+    ฝูงชน: /ฝูงชน|ผู้คนจำนวนมาก|คนมุง|ตลาดนัด/,
+    ภาพระยะใกล้ของมือ: /มือ|ปลายนิ้ว|นิ้วมือ/,
+  },
+  en: {
+    'rain scene': /\brain(?:ing|y)?\b|\bstorm\b/i,
+    'physical contact': /\bkiss(?:es|ed|ing)?\b|\bhug(?:s|ged|ging)?\b|\bhold(?:s|ing)? hands\b|\bwrestl(?:e|es|ed|ing)\b/i,
+    crowd: /\bcrowd\b|\bonlookers?\b|\bpacked (?:hall|market)\b/i,
+    'hand close-up': /\bhand close-?up\b|\bfingertips?\b/i,
+  },
 };
 
-/** 梗概必须是叙述体——出现引号对白就是在写剧本，越界。 */
-const DIALOGUE_RE = /「|」|『|』|“|”/;
+/** 梗概必须是叙述体；默认 zh，避免改变旧文档行为。 */
+const DIALOGUE_RE = {
+  zh: /「|」|『|』|“|”/,
+  th: /["“”]/,
+  en: /["“”]/,
+};
+
+const contentLangOf = (doc) => CONTENT_LANGS.includes(doc?.contentLang) ? doc.contentLang : 'zh';
 
 /* ------------------------------------------------------------------ */
 /* chunk — 按章节分卷                                                   */
@@ -87,7 +109,7 @@ const DIALOGUE_RE = /「|」|『|』|“|”/;
  */
 
 export const CHAPTER_RE =
-  /^[ \t　]*(第[0-9零一二三四五六七八九十百千两]+[章回节卷部][^\n]*|楔子[^\n]*|序章[^\n]*|尾声[^\n]*|番外[^\n]*|Chapter\s+\d+[^\n]*)$/gm;
+  /^[ \t　]*(第[0-9零一二三四五六七八九十百千两]+[章回节卷部][^\n]*|楔子[^\n]*|序章[^\n]*|尾声[^\n]*|番外[^\n]*|Chapter\s+\d+[^\n]*|(?:บท|ตอน)ที่\s*[0-9๐-๙]+[^\n]*)$/gim;
 
 export const DEFAULT_PER_VOLUME = 15;
 export const MAX_VOLUMES = 60;
@@ -177,6 +199,7 @@ const EP_TEXT_FIELDS = ['synopsis', 'hook', 'suspense'];
 
 export function gateReport(outline) {
   const th = thresholdsOf(outline);
+  const contentLang = contentLangOf(outline);
   const gates = [];
   // enKey：中文标签会随条件变化的门（目前只有 refs），英文查表要另给一个键。
   // 门 id 保持稳定不动——它是日志与下游对账的凭据。
@@ -295,7 +318,7 @@ export function gateReport(outline) {
   const riskBad = [];
   for (const e of eps) {
     const text = EP_TEXT_FIELDS.map((f) => e?.[f] ?? '').join(' ');
-    for (const [risk, re] of Object.entries(RISK_PATTERNS)) {
+    for (const [risk, re] of Object.entries(RISK_PATTERNS_BY_LANG[contentLang])) {
       if (re.test(text) && !(e?.warnings ?? []).includes(risk)) riskBad.push(`第 ${e.ep} 集缺「${risk}」`);
     }
   }
@@ -336,7 +359,7 @@ export function gateReport(outline) {
   );
 
   // G11 梗概是叙述体
-  const dlgBad = eps.filter((e) => EP_TEXT_FIELDS.some((f) => DIALOGUE_RE.test(e?.[f] ?? '')));
+  const dlgBad = eps.filter((e) => EP_TEXT_FIELDS.some((f) => DIALOGUE_RE[contentLang].test(e?.[f] ?? '')));
   add(
     'no-dialogue',
     '梗概是叙述体，无引号对白',
@@ -364,6 +387,9 @@ export function validateOutline(outline, stage = 'full') {
   const problems = [];
   const p = (msg) => problems.push(msg);
   if (!outline || typeof outline !== 'object') return ['outline 不是对象'];
+  if (outline.contentLang !== undefined && !CONTENT_LANGS.includes(outline.contentLang)) {
+    p(`contentLang 必须是 ${CONTENT_LANGS.join('/')}，实际是 ${JSON.stringify(outline.contentLang)}`);
+  }
   const th = thresholdsOf(outline);
 
   // --- params ---
@@ -601,6 +627,23 @@ const GATE_LABELS_EN = {
   'refs-props': 'Scene / character / prop references complete — no jobless characters, no unused scenes, no unused props',
   'no-dialogue': 'Synopses in narrative prose, no quoted dialogue',
 };
+const GATE_LABELS_TH = {
+  'lead-cap': 'ตัวละครหลัก {0}–{1} คน',
+  'support-cap': 'ตัวละครสมทบที่มีชื่อ ≤ {0} คน',
+  'functional-cap': 'ตัวละครตามหน้าที่ ≤ {0} คน',
+  'scene-cap': 'ฉากหลัก ≤ {0} ฉาก',
+  'once-scene': 'ฉากที่ใช้ครั้งเดียวมีแผนนำกลับมาใช้',
+  'beat-gap': 'ช่วงห่างของจุดพีค ≤ {0} ตอน และไม่มีช่วงว่าง',
+  'ep1-hook': 'ตอนที่ 1 มีจุดดึงความสนใจ',
+  'major-early': 'จุดพีคใหญ่ไม่ได้ปรากฏครั้งแรกเฉพาะตอนจบ',
+  'ep-fields': 'แต่ละตอนมีเรื่องย่อ จุดดึงความสนใจ และปมค้างครบ',
+  'crowd-plan': 'ฉากที่มีตัวละครอย่างน้อยสามคนมีแผนแยกการถ่าย',
+  'risk-flag': 'ความเสี่ยงในการสร้างภาพอยู่ในรายการเตือน',
+  'prop-cap': 'อุปกรณ์ประกอบเรื่อง ≤ {0} ชิ้น',
+  'refs': 'การอ้างอิงฉากและตัวละครครบถ้วน',
+  'refs-props': 'การอ้างอิงฉาก ตัวละคร และอุปกรณ์ครบถ้วน',
+  'no-dialogue': 'เรื่องย่อเป็นร้อยแก้วบรรยาย ไม่มีบทสนทนาในเครื่องหมายคำพูด',
+};
 const GATE_SKIPS_EN = {
     '未提供 outline.json，本门跳过（视为通过）': 'outline.json not provided — gate skipped (treated as passing)',
     '未提供 art.json，本门跳过（视为通过）': 'art.json not provided — gate skipped (treated as passing)',
@@ -610,12 +653,23 @@ const GATE_SKIPS_EN = {
 };
 /** 报告里的门文案：英文界面取映射，未命中或中文界面回落原文。 */
 const gateText = (g, lang) => {
-  if (lang !== 'en') return { label: g.label, detail: g.detail };
-  const en = GATE_LABELS_EN[g.enKey ?? g.id];
+  if (lang === 'zh') return { label: g.label, detail: g.detail };
+  const translated = (lang === 'th' ? GATE_LABELS_TH : GATE_LABELS_EN)[g.enKey ?? g.id];
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
-  const label = en ? en.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
-  return { label, detail: GATE_SKIPS_EN[g.detail] ?? g.detail };
+  const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
+  let detail = lang === 'en' ? (GATE_SKIPS_EN[g.detail] ?? g.detail) : g.detail;
+  if (lang === 'th') {
+    detail = String(detail)
+      .replace(/^缺：/, 'ขาด: ')
+      .replace(/第\s*(\d+)\s*集/g, 'ตอนที่ $1')
+      .replace(/(\d+)\s*位/g, '$1 คน')
+      .replace(/(\d+)\s*个/g, '$1 รายการ')
+      .replace(/(\d+)\s*件/g, '$1 ชิ้น')
+      .replace('没有 major 爽点', 'ไม่มีจุดพีคใหญ่')
+      .replace('出现引号', 'มีข้อความในเครื่องหมายคำพูด');
+  }
+  return { label, detail };
 };
 
 const I18N = {
@@ -817,10 +871,70 @@ const I18N = {
     mdSec: (n, title) => `${n}. ${title}`,
     colophon: 'Outline generated by the model from the source text; quality gates checked deterministically by script.',
   },
+  th: {
+    langCode: 'th', htmlLang: 'th', kicker: 'โครงเรื่องดัดแปลงสำหรับซีรีส์สั้น',
+    docTitle: (s) => `${s} · โครงเรื่องซีรีส์สั้น`,
+    paramsLine: (p) => `${p.episodes} ตอน × ${p.minutesPerEpisode} นาที · ${p.genre} · รูปแบบ ${p.adaptMode}`,
+    exportJson: 'ส่งออก JSON', gates: 'ด่านคุณภาพ', gatesPass: 'ผ่านทั้งหมด',
+    gatesFail: (n) => `ไม่ผ่าน ${n} ข้อ`, gatePill: (okN, total) => `ด่านคุณภาพ ${okN} / ${total}`,
+    sections: {
+      decisions: 'การตัดสินใจหลัก', rhythm: 'จังหวะจุดพีค', episodes: 'เรื่องย่อรายตอน',
+      episodesOverview: 'ภาพรวมรายตอน', matrix: 'ตารางจัดสรรรายตอน', sceneOverview: 'ภาพรวมฉาก',
+      plan: 'ประมาณการสินทรัพย์', gates: 'ด่านคุณภาพ', adaptation: 'แนวทางดัดแปลง',
+      characters: 'รายชื่อตัวละคร', beats: 'ตารางจุดพีค', assets: 'รายการสินทรัพย์',
+    },
+    dec: {
+      cut: 'เส้นเรื่องที่ตัดออก', merge: 'ตัวละครที่รวมกัน', majors: 'ตอนที่มีจุดพีคใหญ่',
+      castSlots: (n, l, s, f) => `${n} บทบาท (หลัก ${l} · สมทบ ${s} · ตามหน้าที่ ${f})`,
+      leads: 'ตัวละครหลัก', noCut: 'ไม่ตัดเส้นเรื่อง (ดัดแปลงแบบซื่อตรง)', noMajor: 'ไม่มีจุดพีคใหญ่',
+      first: 'ครั้งแรก', final: 'ตอนจบ',
+    },
+    secNotes: {
+      decisions: 'สามเรื่องที่อนุมัติแล้ว', rhythm: (gap) => `ห่างไม่เกิน ${gap} ตอน · ไม่มีช่วงว่าง`,
+      episodes: 'งานส่งมอบหลัก · ครบสามช่องต่อตอน', matrix: 'หนึ่งคอลัมน์ = ใครอยู่ที่ไหนในตอนนั้น',
+      sceneOverview: 'มุมขวาบน = ตอนที่ปรากฏ', plan: 'คำนวณตามระดับโดยอัตโนมัติ',
+      adaptation: 'เหตุผลของการดัดแปลง พร้อมหลักฐานจากต้นฉบับ',
+    },
+    kpi: {
+      episodes: 'จำนวนตอน', perEp: (m) => `× ${m} นาที`, runtime: (m) => `ความยาวรวมประมาณ ${m} นาที`,
+      beats: 'จุดพีค', beatsSub: (major, gap) => `${major} จุดพีคใหญ่${gap ? ` · ห่างสูงสุด ${gap} ตอน` : ''}`,
+      cast: 'ตัวละคร', castSub: (l, s, f) => `หลัก ${l} · สมทบ ${s} · ตามหน้าที่ ${f}`,
+      scenes: 'ฉากหลัก', scenesOnce: (n) => n ? `${n} ฉากใช้ครั้งเดียว ต้องมีแผนนำกลับมาใช้` : 'ไม่มีฉากใช้ครั้งเดียว',
+      risks: 'ความเสี่ยงในการสร้างภาพ', risksNone: 'ไม่มีรายการเตือน',
+      mode: 'รูปแบบการดัดแปลง', modeSub: (cut, merge) => `ตัด ${cut} เส้นเรื่อง · รวม ${merge} กลุ่ม`,
+    },
+    legendMajor: 'จุดพีคใหญ่', legendMinor: 'จุดพีคย่อย', gapNote: (n) => `— เว้น ${n} ตอน —`,
+    tabTimeline: 'เส้นเวลา', tabTable: 'ตาราง', showAllEps: (n) => `แสดงทั้งหมด ${n} ตอน`,
+    assetsAuto: ' (รวมอัตโนมัติจากข้อมูลรายตอน)', core: 'แก่นเรื่องหนึ่งประโยค',
+    keep: 'เก็บไว้', cut: 'ตัดออก', merge: 'รวม', risks: 'ความเสี่ยงและแนวทางรับมือ',
+    what: 'เนื้อหา', why: 'เหตุผล', plan: 'แนวทาง', evidence: 'หลักฐานจากต้นฉบับ',
+    charCols: ['ID', 'ตัวละคร', 'ระดับ', 'บทบาท', 'เส้นทางตัวละคร', '← บันทึกการเปลี่ยนแปลง'],
+    tier: { lead: 'ตัวละครหลัก', support: 'ตัวละครสมทบที่มีชื่อ', functional: 'ตัวละครตามหน้าที่' },
+    tierSpec: { lead: 'ชุดภาพอ้างอิงครบและตรวจความสม่ำเสมอทุกช็อต', support: 'ภาพอ้างอิงครึ่งตัวและตรวจฉากสำคัญ', functional: 'สร้างจากพรอมป์ต์โดยยอมรับความสม่ำเสมอแบบหลวม' },
+    castPlanTitle: 'ประมาณการสินทรัพย์ตัวละคร', castPlanCols: ['ระดับ', 'จำนวน', 'ตัวละคร', 'งานสินทรัพย์'],
+    planSceneRow: 'สภาพแวดล้อมฉาก', planSceneSpec: 'ภาพอ้างอิงสภาพแวดล้อมและแสงหลักหนึ่งชุดต่อฉากหลัก',
+    planSceneReuse: (names) => ` (+ นำ ${names.join(', ')} กลับมาใช้)`, planPropRow: 'อุปกรณ์ประกอบเรื่อง',
+    planPropSpec: 'ภาพอ้างอิงพื้นขาวและภาพแต่ละสถานะ ต้องเหมือนเดิมข้ามตอน',
+    planRiskRow: 'ความเสี่ยงในการสร้างภาพ', planRiskSpec: 'ตรวจรายการเตือนก่อนสร้างภาพ',
+    beatCols: ['ID', 'ประเภท', 'ระดับ', 'ตอน', 'การปูเรื่อง', 'การเฉลย'], weight: { major: 'ใหญ่', minor: 'ย่อย' },
+    rhythm: 'จังหวะจุดพีค', rhythmLegend: '■ ใหญ่　□ ย่อย　· ไม่มี', matrixHead: 'ตัวละคร / ฉาก / อุปกรณ์',
+    matrixTier: 'ระดับ', matrixTotal: 'รวม', matrixScenes: 'ฉาก', matrixProps: 'อุปกรณ์', onceScene: 'ใช้ครั้งเดียว',
+    primaryScene: 'ฉากหลัก', reusePlanLabel: 'แผนนำกลับมาใช้', beatsCarried: 'จุดพีคที่รองรับ',
+    castSeen: 'ตัวละครที่ปรากฏ', crowdOk: 'มีแผนแยกฉาก ✓', epTitle: (n) => `ตอนที่ ${n}`,
+    epHook: 'จุดดึงความสนใจ', epSuspense: 'ปมค้าง', epScenes: 'ฉาก', epCast: 'ตัวละคร',
+    epCrowd: 'แผนแยกฉาก', epWarnings: 'คำเตือน', epsParen: (list) => ` (ตอน ${list.join(', ')})`, epsCount: (n) => `${n} ตอน`,
+    sceneCols: ['ID', 'ฉาก', 'ฉากหลัก', 'ตอน', 'จำนวนครั้ง', 'แผนนำกลับมาใช้'],
+    propCols: ['ID', 'อุปกรณ์', 'หน้าที่ในเรื่อง', 'ตอน', 'จำนวนครั้ง', 'จุดพีคที่เกี่ยวข้อง'],
+    castCols: ['ID', 'ตัวละคร', 'บทบาท', 'ตอน', 'จำนวนครั้ง'], warnCols: ['ความเสี่ยง', 'ตอนที่เกี่ยวข้อง'],
+    beatTypeCols: ['ประเภทจุดพีค', 'ตอน'], yes: 'ใช่', no: 'ไม่ใช่', none: '—',
+    sep: ', ', semi: '; ', colon: ': ', pairSep: ' · ', tipSep: ' | ', brk: (s) => `[${s}]`,
+    mdSec: (n, title) => `${n}. ${title}`,
+    colophon: 'โมเดลสร้างโครงเรื่องจากต้นฉบับ และสคริปต์ตรวจด่านคุณภาพแบบกำหนดผลได้',
+  },
 };
 
 const tOf = (lang) => {
-  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / en');
+  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / th / en');
   return I18N[lang ?? 'zh'];
 };
 
@@ -1563,13 +1677,35 @@ const USAGE = `novel-outline.mjs — novel-outline skill 的确定性工具
                                       stage: skeleton / beats / full（默认 full）
   checkup <outline.json>              体检模式：只打印质量门 ✓/✗，有未过项 exit 1
   render <outline.json> [--html|--md] 渲染大纲报告到 stdout（默认 --md）
-         [--lang zh|en]               报告界面语言：--lang 优先，其次 outline.json 的
+         [--lang zh|th|en]            报告界面语言：--lang 优先，其次 outline.json 的
                                       lang 字段，默认 zh；数据内容不翻译
   assets <outline.json>               打印自动汇总的资产清单 JSON
   slug <name>                         书名转安全文件名
 
 chunk 选项：
   --per-volume <n>   每卷章数，默认 ${DEFAULT_PER_VOLUME}`;
+
+const CLI_TEXT = {
+  zh: { usage: USAGE, failed: (n, stage) => `✗ ${n} 处违规（stage=${stage}）：\n`, passed: (stage) => `✓ 通过校验（stage=${stage}）`,
+    summary: (n) => n ? `\n✗ ${n} 项未过` : '\n✓ 全部通过' },
+  th: { usage: `novel-outline.mjs — เครื่องมือตรวจและเรนเดอร์โครงเรื่อง\n\n  chunk <book.txt> <workdir> [--per-volume n]\n  validate <outline.json> [--stage skeleton|beats|full] [--lang th]\n  checkup <outline.json> [--lang th]\n  render <outline.json> [--html|--md] [--lang zh|th|en]\n  assets <outline.json>\n  slug <name>`,
+    failed: (n, stage) => `✗ พบข้อผิดพลาด ${n} รายการ (stage=${stage}):\n`, passed: (stage) => `✓ ผ่านการตรวจสอบ (stage=${stage})`,
+    summary: (n) => n ? `\n✗ ไม่ผ่าน ${n} ข้อ` : '\n✓ ผ่านทั้งหมด' },
+  en: { usage: `novel-outline.mjs — deterministic outline tools\n\n  chunk <book.txt> <workdir> [--per-volume n]\n  validate <outline.json> [--stage skeleton|beats|full] [--lang en]\n  checkup <outline.json> [--lang en]\n  render <outline.json> [--html|--md] [--lang zh|th|en]\n  assets <outline.json>\n  slug <name>`,
+    failed: (n, stage) => `✗ ${n} validation error(s) (stage=${stage}):\n`, passed: (stage) => `✓ Validation passed (stage=${stage})`,
+    summary: (n) => n ? `\n✗ ${n} gate(s) failed` : '\n✓ All passed' },
+};
+const cliFor = (lang) => {
+  if (!CLI_TEXT[lang]) throw new Error('界面语言必须是 zh / th / en');
+  return CLI_TEXT[lang];
+};
+const problemText = (message, lang) => {
+  if (lang === 'zh') return message;
+  const pairs = lang === 'th'
+    ? [['质量门未过', 'ไม่ผ่านด่านคุณภาพ'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ'], ['超过上限', 'เกินขีดจำกัด'], ['第 ', 'ตอนที่ '], [' 集', '']]
+    : [['质量门未过', 'Quality gate failed'], ['缺少', 'Missing '], ['缺失', 'missing'], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated'], ['超过上限', 'exceeds the limit'], ['第 ', 'Episode '], [' 集', '']];
+  return pairs.reduce((text, [from, to]) => text.replaceAll(from, to), String(message));
+};
 
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(path), 'utf8'));
@@ -1582,9 +1718,11 @@ function flag(rest, name, fallback = null) {
 
 function main(argv) {
   const [cmd, ...rest] = argv;
+  const explicitLang = flag(argv, '--lang', null);
+  if (explicitLang) cliFor(explicitLang);
 
   if (!cmd || cmd === '-h' || cmd === '--help') {
-    console.log(USAGE);
+    console.log(cliFor(explicitLang ?? 'zh').usage);
     process.exit(cmd ? 0 : 1);
   }
 
@@ -1610,30 +1748,39 @@ function main(argv) {
     if (!path) throw new Error('用法：validate <outline.json> [--stage skeleton|beats|full]');
     const stage = flag(rest, '--stage', 'full');
     if (!STAGES.includes(stage)) throw new Error(`--stage 只能是 ${STAGES.join('/')}`);
-    const problems = validateOutline(readJson(path), stage);
+    const outline = readJson(path);
+    const cliLang = explicitLang ?? outline.lang ?? 'zh';
+    const cli = cliFor(cliLang);
+    const problems = validateOutline(outline, stage);
     if (problems.length) {
-      console.error(`✗ ${problems.length} 处违规（stage=${stage}）：\n`);
-      for (const x of problems) console.error('  ' + x);
+      console.error(cli.failed(problems.length, stage));
+      for (const x of problems) console.error('  ' + problemText(x, cliLang));
       process.exit(1);
     }
-    console.log(`✓ 通过校验（stage=${stage}）`);
+    console.log(cli.passed(stage));
     return;
   }
 
   if (cmd === 'checkup') {
     const [path] = rest;
     if (!path) throw new Error('用法：checkup <outline.json>');
-    const gates = gateReport(readJson(path));
-    for (const g of gates) console.log(`${g.ok ? '✓' : '✗'} ${g.label}${!g.ok && g.detail ? ` — ${g.detail}` : ''}`);
+    const outline = readJson(path);
+    const cliLang = explicitLang ?? outline.lang ?? 'zh';
+    const cli = cliFor(cliLang);
+    const gates = gateReport(outline);
+    for (const g of gates) {
+      const shown = gateText(g, cliLang);
+      console.log(`${g.ok ? '✓' : '✗'} ${shown.label}${!g.ok && shown.detail ? ` — ${shown.detail}` : ''}`);
+    }
     const failed = gates.filter((g) => !g.ok).length;
-    console.log(failed ? `\n✗ ${failed} 项未过` : '\n✓ 全部通过');
+    console.log(cli.summary(failed));
     if (failed) process.exit(1);
     return;
   }
 
   if (cmd === 'render') {
     const [path] = rest;
-    if (!path) throw new Error('用法：render <outline.json> [--html|--md] [--lang zh|en]');
+    if (!path) throw new Error('用法：render <outline.json> [--html|--md] [--lang zh|th|en]');
     const outline = readJson(path);
     // 语言优先级：--lang > outline.json 顶层 lang 字段 > zh（render 函数内解析）
     const lang = flag(rest, '--lang', null);

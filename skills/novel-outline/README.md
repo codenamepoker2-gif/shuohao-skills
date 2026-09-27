@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-8b1a1a?style=for-the-badge)](README.md)
 [![English](https://img.shields.io/badge/English-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![关注作者 X](https://img.shields.io/badge/%E5%85%B3%E6%B3%A8%E4%BD%9C%E8%80%85-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-outline
@@ -62,7 +63,7 @@
 - **资产量折算**：角色三档、场景环境、生成难点各折算成备产工作量，全部自动汇总
 - **质量门**：页眉徽章 + 未过时的病灶横幅 + 文末完整清单，✓/✗ 由脚本算好烘进页面
 - **导出 JSON** 按钮：下载的就是 `outline.json` 原样，改完能直接喂回 `render` / `validate`
-- **报告界面内置中英**：默认中文，`--lang en` 出全英文界面（也可以跟 outline.json 顶层的 `lang` 字段，`--lang` 优先）。只翻译界面文案，数据内容——爽点类型、梗概、质量门文案——原样出 英文界面下质量门标签同样翻译（阈值原样），门的失败详情与数据内容保持原文。
+- **报告界面内置中、泰、英三语**：默认中文，`--lang th` / `--lang en` 切换界面（也可以写在 outline.json 顶层 `lang` 字段，命令行优先）。正文语言由 `contentLang: "zh" | "th" | "en"` 指定，默认 `zh`；泰文和英文会使用各自的引号对白与生成难点规则。
 - 全部图形是内联 SVG/CSS，配色跑过可视化验证器，零外部依赖，离线双击能开
 
 ## 体检模式
@@ -90,6 +91,7 @@ node scripts/novel-outline.mjs validate outline.json            # 校验（--sta
 node scripts/novel-outline.mjs checkup outline.json             # 只跑质量门
 node scripts/novel-outline.mjs render outline.json --html       # 出报告（界面默认中文）
 node scripts/novel-outline.mjs render outline.json --html --lang en > outline-report.html   # 英文界面报告
+node scripts/novel-outline.mjs render outline.json --html --lang th > outline-report.html   # 泰文界面报告
 node scripts/novel-outline.mjs assets outline.json              # 资产清单 JSON
 ```
 
@@ -105,7 +107,7 @@ node scripts/novel-outline.mjs assets outline.json              # 资产清单 J
 SKILL.md                 给 agent 读的工作流
 scripts/
   novel-outline.mjs      chunk / validate / checkup / render / assets
-  selftest.mjs           249 项断言，不调模型
+  selftest.mjs           260 项断言，不调模型
 references/
   schema.md              outline.json 结构 + 硬规则
   volume-pass.md         分卷摘要怎么写
@@ -124,6 +126,6 @@ assets/
 node scripts/selftest.mjs
 ```
 
-249 项断言，覆盖分卷 / 校验 / 质量门逐项击穿 / 资产汇总 / 渲染（中英两套界面）/ 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
+260 项断言，覆盖分卷（含泰文章节标题）/ 校验 / 质量门逐项击穿 / 泰文内容 / 资产汇总 / 渲染（三语界面）/ 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
 
 **只在 macOS + Node 24 上实测过。** 代码没有平台相关调用，Linux 和更低版本 Node 理论上没问题，但**没验过**。
