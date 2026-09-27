@@ -1,3 +1,5 @@
+[ไทย](README.th.md) · [English](README.en.md) · [中文](README.md)
+
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-8b1a1a?style=for-the-badge)](README.md)
 [![English](https://img.shields.io/badge/English-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.en.md)
 [![关注作者 X](https://img.shields.io/badge/%E5%85%B3%E6%B3%A8%E4%BD%9C%E8%80%85-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
@@ -23,7 +25,7 @@
 | [**novel-script**](skills/novel-script) | 给 AI 短剧写剧本：场次 + 节拍流（动作与台词交替），逐集时长按语速确定性折算，钩子前 3 拍冷开场兑现是门，台词本按角色聚合带音色提示词直接对接 TTS。10 道质量门全部脚本检查 |
 | [**novel-storyboard**](skills/novel-storyboard) | 给 AI 短剧出分镜：段（一次生成 ≤15 秒）→ 分镜（2–5 秒硬门）→ 分镜图（主图钉 0.00 秒、子图钉各自切点），MiniMax H3 提示词的对齐指令与切点时刻逐字对账；分镜图拿设定图当参考图真出图，export 一键出 H3 / Seedance 投产包。18 道质量门全部脚本检查 |
 
-**五段管线 skill 的报告都支持中英双语界面**：默认中文，`render --lang en` 出全英文报告（数据内容保持原文）。character-refs 的报告同样内置中英日界面，其他语言现场翻译。
+**六个 skill 的界面支持中文、英文和泰文**：使用 `--lang th` 或 `--lang en`，优先级为 `--lang` > JSON 的 `lang` > 默认 `zh`。character-refs 继续支持日文与自定义界面。故事内容语言单独使用 `contentLang: "zh" | "th" | "en"`，默认中文；界面语言不会翻译故事。图像与视频模型提示词仍然使用英文。泰文时长初始使用每秒 13 个字符（不计组合元音和声调符号），需要按配音实测校准；中文保持原有每秒 4.5 字。
 
 ## AI 短剧交流社群
 
@@ -54,7 +56,7 @@ node scripts/report.mjs --from <demo目录> --out report.html
 默认一次显示一个面板（五份加起来将近六十万字符）。左下角「平铺全部」把所有面板同时展开，Cmd+F 恢复全局搜索。数字键 `1`–`5` 切面板，`#pane-script` 这样的深链可以直接分享到某一屏。
 
 ```bash
-node scripts/report-selftest.mjs   # 92 项断言，不起浏览器
+node scripts/report-selftest.mjs   # 112 项断言，不起浏览器
 ```
 
 丢一本小说进去，出这五套：

@@ -1,3 +1,5 @@
+[ไทย](README.th.md) · [English](README.en.md) · [中文](README.md)
+
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
@@ -26,7 +28,7 @@ Here is the whole pipeline — **the outline converges the structure; script, sc
 | [**novel-script**](skills/novel-script/README.en.md) | Screenwriting for AI short drama: scenes + beat flow (action beats alternating with dialogue lines), per-episode duration deterministically estimated from reading speed, a gated cold-open hook in the first 3 beats, a per-character line book with voice prompts that feeds straight into TTS. All 10 quality gates script-checked |
 | [**novel-storyboard**](skills/novel-storyboard/README.en.md) | Storyboarding for AI short drama: segments (one generation, ≤15s) → cuts (2–5s hard gate) → keyframes (master pinned at 0.00s, sub-frames at their cut marks), with MiniMax H3 prompt alignment and cut times audited verbatim; frames actually generated with the design sheets as references, plus one-command H3 / Seedance production packs. All 18 quality gates script-checked |
 
-**The five pipeline skills render their reports in English too** — reports default to a Chinese UI; pass `--lang en` to `render` for a fully English report (data content stays as authored). character-refs ships Chinese, English and Japanese UIs too, and translates on the spot for other languages.
+**All six skills support Thai, English and Chinese interfaces.** Use `--lang th` or `--lang en`; UI language follows `--lang` > the JSON `lang` field > `zh`. character-refs also retains Japanese and custom UI dictionaries. UI language does not translate story content. Set `contentLang: "th"` or `contentLang: "en"` in story JSON to select content validation; omitted `contentLang` preserves Chinese behavior. Image and video prompts remain English.
 
 ## One page for the whole pipeline
 
@@ -49,7 +51,7 @@ Merging solves three problems, **all of them inside the assembler, none inside t
 One pane shows at a time by default (the five together run to roughly 600k characters). "Show all" in the bottom-left expands every pane so Cmd+F reaches the whole document. Number keys `1`–`5` switch panes, and `#pane-script` deep-links straight to one.
 
 ```bash
-node scripts/report-selftest.mjs   # 92 assertions, no browser needed
+node scripts/report-selftest.mjs   # 112 assertions, no browser needed
 ```
 
 Point it at a novel and you get all five:
@@ -112,7 +114,7 @@ ln -s "$PWD/skills/novel-characters" ~/.codex/skills/novel-characters
 | **codex CLI** | Optional | Just one of the two runtimes these skills run in, equivalent to Claude Code. The five pipeline skills **do not generate images**, so none of its local capabilities are needed |
 | **Image model** | Only for character-refs | One of: your own ComfyUI (Qwen Image), local codex image generation (uses your ChatGPT plan quota), an OpenAI API key (GPT Image 2), or a custom command. Chosen on first use |
 
-> **Note on output language.** These skills are Chinese-first. `novel-characters` produces Chinese character profiles even for an English source novel, and its validator actively rejects English in those fields. See that skill's README for what it would take to change.
+> **Thai dialogue timing.** The initial Thai rate is 13 characters/second, excluding combining vowel and tone marks. This is a starting value to measure against your actors or TTS voice, not a universal speaking rate. Chinese keeps its existing 4.5 characters/second default. Consult each skill’s README for content-language fields and gate details.
 
 ## Repository conventions
 
