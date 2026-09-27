@@ -13,6 +13,7 @@ import {
   exportPack,
   H3_I2VA_LINE,
   SHOT_SIZES,
+  THAI_CHARS_PER_SECOND,
   computeStats,
   cutStarts,
   expandScript,
@@ -34,6 +35,7 @@ import {
   SEEDANCE_NO_TWINS,
   seedancePrompt,
   seedFromScript,
+  scriptLineChars,
   segSeconds,
   slug,
   validateStoryboard,
@@ -72,6 +74,8 @@ eq(e1.scenes[0].beats[0].seconds, 2.5, '动作按 2.5 秒计');
 eq(e1.scenes[0].beats[2].speaker, 'C03', '台词带说话人');
 eq(e1.targetSeconds, 120, '目标秒数带出来');
 eq(expandScript(null).size, 0, '空剧本不崩');
+eq(scriptLineChars('สวัสดีค่ะ', 'th'), 6, '泰文节拍计数忽略组合元音与声调符号');
+eq(scriptLineChars('𠀀'), 2, '中文节拍计数保持上游 UTF-16 行为');
 
 /* ---------------- H3 骨架推导 ---------------- */
 
@@ -122,6 +126,63 @@ eq(gateReport(FIXTURE, CTX).length, 18, '十八道门');
   const gates = gateReport(FIXTURE, {});
   ok(gates.every((g) => g.ok), '不带上游也通过（对账门跳过）');
   ok(gates.find((g) => g.id === 'coverage').detail.includes('跳过'), '跳过要明说，不静默');
+}
+
+// Thai story → script timing → storyboard gates. H3 protocol stays English while
+// the dialogue remains verbatim inside a language-labelled <d> block.
+const THAI_SCRIPT = clone(SCRIPT);
+THAI_SCRIPT.contentLang = 'th';
+THAI_SCRIPT.lang = 'th';
+for (const ep of THAI_SCRIPT.episodes) {
+  for (const scene of ep.scenes) {
+    for (const beat of scene.flow) {
+      if (typeof beat.line === 'string') beat.line = 'ไปกันเถอะ';
+      else beat.action = 'หญิงสาวค่อย ๆ หันไปมองแม่น้ำ';
+    }
+  }
+}
+const THAI_BOARD = clone(FIXTURE);
+THAI_BOARD.contentLang = 'th';
+THAI_BOARD.lang = 'th';
+const thaiExpanded = expandScript(THAI_SCRIPT);
+for (const ep of THAI_BOARD.episodes) {
+  const scriptEp = thaiExpanded.get(ep.ep);
+  for (const seg of ep.segments) {
+    const scene = scriptEp.scenes[seg.sceneIndex - 1];
+    const starts = cutStarts(seg.cuts);
+    const lines = seg.cuts.map((cut, ci) => {
+      cut.frame = `${SHOT_SIZES[cut.size].en}, a young woman standing beside a river`;
+      cut.shot = 'หญิงสาวค่อย ๆ หันไปมองแม่น้ำ';
+      cut.shotPrompt = 'A young woman slowly turns to look across the river.';
+      cut.lens = '50mm';
+      cut.cameraPosition = 'ระดับสายตา';
+      cut.composition = 'กฎสามส่วน';
+      cut.eyeline = 'อีกฝั่งของแม่น้ำ';
+      cut.focus = 'ใบหน้าหญิงสาว';
+      seg.blocking = 'หญิงสาวอยู่ด้านซ้ายของภาพและหันหน้าไปทางแม่น้ำ';
+      const [from, to] = cut.beats;
+      const dialogue = scene.beats.slice(from - 1, to)
+        .filter((b) => b.kind === 'line')
+        .map((b) => `<d>[Thai] ${b.text}</d>`)
+        .join(' ');
+      const head = ci === 0 ? '[Shot 1]' : `[Shot ${ci + 1}] At ${h3CutTime(starts[ci])},`;
+      return `${head} ${cut.camera} follows a person by a river. ${dialogue}`.trim();
+    });
+    seg.h3Prompt = [
+      h3AlignmentLine(seg.cuts),
+      'integrated_multimodal_description:',
+      ...lines,
+      'overall_soundscape: Quiet water and distant wind.',
+      'non_diegetic_music: N/A',
+    ].join('\n');
+  }
+}
+{
+  const firstThaiLine = thaiExpanded.get(1).scenes[0].beats.find((b) => b.kind === 'line');
+  eq(firstThaiLine.seconds, Math.round((scriptLineChars('ไปกันเถอะ', 'th') / THAI_CHARS_PER_SECOND) * 10) / 10, '泰文剧本按 13 个基础字符每秒展开');
+  ok(THAI_BOARD.episodes[0].segments[0].h3Prompt.includes('<d>[Thai] ไปกันเถอะ</d>'), '泰文台词逐字进入带 Thai 标签的 H3 <d> 块');
+  ok(gateReport(THAI_BOARD, { ...CTX, script: THAI_SCRIPT }).every((g) => g.ok), '泰文剧本到泰文分镜的十八道门端到端全部通过');
+  eq(validateStoryboard(THAI_BOARD, { ...CTX, script: THAI_SCRIPT }).length, 0, '泰文故事通过完整分镜结构校验');
 }
 
 /* ---------------- 质量门：逐门击穿 ---------------- */
@@ -725,12 +786,17 @@ eq(seeded.episodes[0].seedScenes[0].beats.length, 13, '底稿带全部节拍');
 ok(seeded.episodes[0].seedScenes[0].beats[0].seconds > 0, '每拍带秒数');
 eq(seedFromScript(SCRIPT, [2, 3]).episodes.map((e) => e.ep).join(','), '2,3', '--eps 区间过滤');
 eq(seedFromScript({}).episodes.length, 0, '空剧本不崩');
+{
+  const thaiSeed = seedFromScript(THAI_SCRIPT);
+  eq(thaiSeed.contentLang, 'th', 'seed 从剧本继承泰文内容语言');
+  eq(thaiSeed.lang, 'th', 'seed 同时继承泰文报告界面语言');
+}
 
 /* ---------------- slug / 枚举 ---------------- */
 
 eq(slug('渡口'), '渡口', '中文原样');
 eq(slug('  '), 'storyboard', '空名兜底');
-ok(Object.values(SHOT_SIZES).every((s) => s.zh && s.phrase), '景别枚举带中文名与英文短语');
+ok(Object.values(SHOT_SIZES).every((s) => s.zh && s.th && s.phrase), '景别枚举带中泰名称与英文短语');
 ok(Object.keys(CAMERA_MOVES).length >= 18, '运镜词表覆盖 H3 全部动作类型');
 ok(CAMERA_MOVES['Static Shot'] === '固定' && CAMERA_MOVES['Push In'] === '推', '运镜词表中英对照');
 
@@ -855,9 +921,9 @@ ok(html.includes('老周'), 'html 里 ID 换成名字');
   try {
     renderHtml(FIXTURE, { ...CTX, lang: 'ja' });
   } catch (e) {
-    threw = /zh \/ en/.test(e.message);
+    threw = /zh \/ th \/ en/.test(e.message);
   }
-  ok(threw, '非法界面语言抛错并点名内置 zh / en');
+  ok(threw, '非法界面语言抛错并点名内置 zh / th / en');
 }
 
 // 质量门面板是报告的一部分：英文界面下门标签也要翻译（阈值由门自己算，原样保留）

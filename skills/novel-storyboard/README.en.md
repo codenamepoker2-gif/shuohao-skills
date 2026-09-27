@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-storyboard
@@ -74,7 +75,7 @@ Pass `--no-log` to skip it. If the file cannot be written the step is skipped si
 
 ## The report
 
-A single-page, 1600px-wide review document. Reports render with a Chinese UI by default; pass `--lang en` to `render` for a fully English report (zh / en built in). This only switches the UI labels — it is independent of `promptLang`, which controls the H3 prompt language (English by default). In English mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored.
+A single-page, 1600px-wide review document. Reports ship with Chinese, Thai, and English UI; pass `--lang th` or `--lang en` to `render` (Chinese by default, or the storyboard.json top-level `lang` field — the flag wins). This only switches the UI labels — it is independent of `promptLang`, which controls the H3 prompt language (English by default). In every language mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored. Content language is set separately with `contentLang: "zh" | "th" | "en"` (default `zh`): Thai dialogue is timed at 13 base characters/second (combining vowel and tone marks ignored), Chinese keeps 4.5 chars/second.
 
 - **KPI band**: segments / cuts with average length / total vs target / generation batches / segments carrying dialogue
 - **Cut rhythm strip** (the signature chart): one band per episode, **thick separators = segment boundaries (one generation each)**, slice width = cut duration share, color depth = shot size; click a slice to jump to its segment card
@@ -105,6 +106,7 @@ node scripts/novel-storyboard.mjs checkup sb.json --script script.json
 node scripts/novel-storyboard.mjs validate sb.json --script script.json --shots /path/to/cards   # optional: the 17th gate
 node scripts/novel-storyboard.mjs render sb.json --html --script script.json --outline outline.json --art art.json > storyboard-report.html
 node scripts/novel-storyboard.mjs render sb.json --html --lang en --script script.json --outline outline.json --art art.json > storyboard-report.html   # English report UI
+node scripts/novel-storyboard.mjs render sb.json --html --lang th --script script.json --outline outline.json --art art.json > storyboard-report.html   # Thai report UI
 node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-segment folders: f1..fN.png + prompt.md
 ```
 
@@ -113,7 +115,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-se
 - No writing or rewriting dialogue, no design sheets, no video generation or editing
 - Lip-sync is out of scope for now — that belongs to the generation pipeline
 - Seconds are a **generation order, not an estimate**; tune the segment cap and cut-rhythm range in `params` per your model
-- Report UI ships in Chinese (default) and English — pick with `--lang`; the prompt language is controlled separately by `promptLang` (English by default)
+- Report UI ships in Chinese (default), Thai, and English — pick with `--lang`; content language is set separately with `contentLang` (`zh` / `th` / `en`, default `zh`), and Thai dialogue is timed at 13 base characters/second ignoring combining marks; the prompt language is controlled separately by `promptLang` (English by default)
 - Generate the first segment's full frame set (3–5 images) for approval before committing — one episode is ~30–40 frames, and a wrong art direction wastes the batch
 
 ## Selftest
@@ -122,7 +124,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-se
 node scripts/selftest.mjs
 ```
 
-323 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, rendering (both report UI languages), H3 and Seedance export. No model calls, runs in about a second.
+331 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, Thai content timing, rendering (all three report UI languages), H3 and Seedance export. No model calls, runs in about a second.
 
 The bundled example (`examples/渡口-storyboard.json`) is a complete episode-1 storyboard — 10 segments, 34 cuts claiming all 35 script beats at ~3.5s per cut, 119s against a 120s target, 2 generation batches, every segment carrying a fully audited H3 prompt.
 
