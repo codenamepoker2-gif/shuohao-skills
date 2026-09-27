@@ -4,6 +4,7 @@
 // 证明它真的会拦，不是一个永远为真的假测试。
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,7 @@ import {
   gateReport,
   lineChars,
   paramsOf,
+  problemText,
   renderHtml,
   renderMarkdown,
   sceneSeconds,
@@ -477,5 +479,26 @@ ok(html.includes('lang="zh"'), '默认报告 html lang 是 zh');
   const gateEn = renderHtml(FIXTURE, { ...CTX, lang: 'en' });
   ok(gateEn.includes('Episode duration within'), 'EN 报告的质量门标签翻译且阈值原样保留');
   ok(!gateEn.includes('每集时长在目标'), 'EN 报告不再出现中文门标签');
+}
+{
+  const thaiHtml = renderHtml(FIXTURE, { ...CTX, lang: 'th' });
+  ok(thaiHtml.includes('html:lang(th) .hd h1'), 'รูปแบบอักษรไทยยกเลิกระยะห่างตัวอักษรในหัวเรื่องและป้ายกำกับ');
+  ok(!/[\u3400-\u9fff]/.test(problemText('第 1 集第 1 场有台词缺 speaker', 'th')), 'ข้อความวินิจฉัยโครงสร้างภาษาไทยไม่มีอักษรจีน');
+  ok(!/[\u3400-\u9fff]/.test(problemText('第 1 集第 1 场有台词缺 speaker', 'en')), 'English structure diagnostics contain no Chinese characters');
+}
+{
+  const cli = join(here, 'novel-script.mjs');
+  const script = join(here, '..', 'examples', '渡口-script.json');
+  const outline = join(here, '..', 'references', 'test-fixtures', 'upstream', '渡口-outline.json');
+  const art = join(here, '..', 'references', 'test-fixtures', 'upstream', '渡口-art.json');
+  const th = spawnSync(process.execPath, [cli, 'checkup', script, '--outline', outline, '--art', art, '--lang', 'th'], { encoding: 'utf8' });
+  eq(th.status, 0, 'checkup ภาษาไทยทำงานสำเร็จผ่าน CLI');
+  ok(th.stdout.includes('ผ่านทั้งหมด') && !/[\u3400-\u9fff]/.test(th.stdout + th.stderr), 'ผล checkup ภาษาไทยไม่มีข้อความจีน');
+  const en = spawnSync(process.execPath, [cli, 'validate', script, '--outline', outline, '--art', art, '--lang', 'en'], { encoding: 'utf8' });
+  eq(en.status, 0, 'English validate succeeds through the CLI');
+  ok(en.stdout.includes('Validation passed') && !/[\u3400-\u9fff]/.test(en.stdout + en.stderr), 'English validate output contains no Chinese UI text');
+  const badUsage = spawnSync(process.execPath, [cli, 'validate', '--lang', 'th'], { encoding: 'utf8' });
+  eq(badUsage.status, 1, 'คำสั่งที่ขาดไฟล์จบด้วยสถานะผิดพลาด');
+  ok(badUsage.stderr.includes('วิธีใช้:') && !/[\u3400-\u9fff]/.test(badUsage.stderr), 'ข้อความวิธีใช้เมื่อผิดพลาดเป็นภาษาไทยทั้งหมด');
 }
 console.log(`✓ ${passed} 项自测全部通过`);

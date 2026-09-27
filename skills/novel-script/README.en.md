@@ -90,7 +90,7 @@ The report UI defaults to Chinese; `--lang en` renders it fully in English.
 node scripts/selftest.mjs
 ```
 
-175 assertions — timing engine, stats, gate-defeating cases, seed, Thai content timing, rendering (all three UI languages), export. No model calls, runs in about a second.
+184 assertions — timing engine, stats, gate-defeating cases, seed, Thai content timing, Thai and English CLI output, rendering (all three UI languages), export. No model calls, runs in about a second.
 
 The bundled example (`examples/渡口-script.json`) is a **complete 6-episode script** — 9 scenes, 123 lines, every episode inside the ±15% band, all gates passing against the outline and art fixtures.
 
