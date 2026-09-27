@@ -30,6 +30,8 @@ Here is the whole pipeline — **the outline converges the structure; script, sc
 
 **All six skills support Thai, English and Chinese interfaces.** Use `--lang th` or `--lang en`; UI language follows `--lang` > the JSON `lang` field > `zh`. character-refs also retains Japanese and custom UI dictionaries. UI language does not translate story content. Set `contentLang: "th"` or `contentLang: "en"` in story JSON to select content validation; omitted `contentLang` preserves Chinese behavior. Image and video prompts remain English.
 
+For storyboards with `contentLang: "th"` or `"en"`, every cut requires an English `shotPrompt` for Seedance and an English `frame` for image generation; `shot` remains the local-language description. Keep dialogue out of these fields: the exporter inserts the original spoken lines inside dialogue markers. See the [storyboard schema](skills/novel-storyboard/references/schema.md) for the model-facing composition fields.
+
 ## One page for the whole pipeline
 
 The five stage reports can be merged into a single page with a left-hand nav — **you get a pane for every stage you actually have**:
@@ -51,7 +53,7 @@ Merging solves three problems, **all of them inside the assembler, none inside t
 One pane shows at a time by default (the five together run to roughly 600k characters). "Show all" in the bottom-left expands every pane so Cmd+F reaches the whole document. Number keys `1`–`5` switch panes, and `#pane-script` deep-links straight to one.
 
 ```bash
-node scripts/report-selftest.mjs   # 112 assertions, no browser needed
+node scripts/report-selftest.mjs   # 113 assertions, no browser needed
 ```
 
 Point it at a novel and you get all five:

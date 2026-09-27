@@ -56,7 +56,7 @@ node scripts/report.mjs --from <demo目录> --out report.html
 默认一次显示一个面板（五份加起来将近六十万字符）。左下角「平铺全部」把所有面板同时展开，Cmd+F 恢复全局搜索。数字键 `1`–`5` 切面板，`#pane-script` 这样的深链可以直接分享到某一屏。
 
 ```bash
-node scripts/report-selftest.mjs   # 112 项断言，不起浏览器
+node scripts/report-selftest.mjs   # 113 项断言，不起浏览器
 ```
 
 丢一本小说进去，出这五套：
