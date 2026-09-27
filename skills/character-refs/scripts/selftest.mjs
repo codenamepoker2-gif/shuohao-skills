@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { chunks, crc32, decode, flattenAlpha, pngInfo, readText, solidPng, withText } from './png.mjs';
 import { deflateSync } from 'node:zlib';
 import {
-  ANCHOR, DEFAULT_LOOK, allViews, anchorUsable, assetFromIntake, buildPrompt, confirmTable, current, defaultSkin, gates,
+  ANCHOR, DEFAULT_LOOK, allViews, anchorUsable, assetFromIntake, buildPrompt, confirmTable, contentLength, current, defaultSkin, gates,
   intakeProblems, nounOf, resolveLayers, pronouns, recordVersion, resolveRefs, staleReasons, viewsOfTier,
 } from './core.mjs';
 import {
@@ -28,6 +28,7 @@ import { lookHash } from './core.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const CLI = join(here, 'character-refs.mjs');
 const INTAKE = JSON.parse(readFileSync(join(here, '..', 'examples', '阿禾-intake.json'), 'utf8'));
+const THAI_INTAKE = JSON.parse(readFileSync(join(here, '..', 'examples', 'มะลิ-intake.json'), 'utf8'));
 const clone = (x) => structuredClone(x);
 const REAL = lookSnapshot(findLook('写实'));
 const A0 = () => assetFromIntake(INTAKE, REAL);
@@ -109,6 +110,20 @@ const g = (buf, ratio, kind) => Object.fromEntries(gates(buf, ratio, kind).map((
 
 /* ---------------- 一次性输入 ---------------- */
 eq(intakeProblems(INTAKE).length, 0, '样例输入零问题');
+eq(intakeProblems(THAI_INTAKE).length, 0, '泰文样例输入通过完整 intake 门');
+ok(confirmTable(THAI_INTAKE).includes('รอยืนยัน') && confirmTable(THAI_INTAKE).includes('ข้อมูลบุคคล'), '泰文确认表使用内置泰文界面');
+eq(contentLength('ก้', 'th'), 1, '泰文长度忽略组合元音与声调符号');
+eq(contentLength('中文', 'zh'), 2, '中文长度计数保持不变');
+{
+  const x = clone(THAI_INTAKE);
+  x.face.en = 'หญิงไทยใบหน้ารูปไข่';
+  ok(intakeProblems(x).some((p) => p.includes('英文')), '泰文不能进入英文出图字段');
+}
+{
+  const x = clone(THAI_INTAKE);
+  x.face.text = 'Oval face';
+  ok(intakeProblems(x).some((p) => p.includes('ควรเป็นภาษาไทย')), '泰文内容门拒绝英文人类字段');
+}
 const bad = (mut, word, label) => {
   const x = clone(INTAKE);
   mut(x);
@@ -178,6 +193,8 @@ bad((x) => { x.lang = 'fr'; }, 'ui-template fr', '非内置语言没带 ui 被�
 
 /* ---------------- 界面文案 ---------------- */
 for (const l of BUILTIN) eq(uiMissing(UI[l]).length, 0, `内置语言 ${l} 的文案齐全`);
+ok(BUILTIN.includes('th'), 'th 是内置界面语言');
+ok(uiFor('th').title === 'ภาพอ้างอิงตัวละคร', '泰文报告标题使用内置翻译');
 assert.throws(() => uiFor('fr'), /ui-template fr/); passed++;
 ok(uiFor('fr', uiTemplate('fr')).htmlLang === 'fr', '自译文案齐全即可使用');
 eq(uiFor('en', { title: 'Cast refs' }).title, 'Cast refs', '内置语言可以只覆盖几项');
@@ -193,7 +210,7 @@ eq(findLook('油画'), null, '没有的预设返回空');
 eq(DEFAULT_LOOK.id, 'anime', '默认动漫');
 eq(findLook('卡通')?.id, 'anime', '「卡通」也是动漫');
 eq(assetFromIntake(INTAKE).outfits.default.look.id, 'anime', '不指定画风：建资产用动漫');
-ok(LOOKS.every((l) => l.label.zh && l.label.en && l.label.ja && ['photo', 'drawn'].includes(l.medium) && lookProblems(l).length === 0), '每个预设都有中英日名字、介质，且自身合规');
+ok(LOOKS.every((l) => l.label.zh && l.label.th && l.label.en && l.label.ja && ['photo', 'drawn'].includes(l.medium) && lookProblems(l).length === 0), '每个预设都有中英泰日名字、介质，且自身合规');
 ok(!('names' in lookSnapshot(findLook('anime'))), '快照不带命令行别名');
 {
   const legacy = { id: 'realistic-photo', label: '写实照片（方案四）', style: REAL.style, clean: REAL.clean, neg: REAL.neg };
@@ -456,6 +473,9 @@ const serve = (handler) => new Promise((ok_) => {
   ok(en.includes('Character description (confirmation table)') && en.includes('inferred') && en.includes('Style: Anime'), '英文报告：确认表标签、来源、画风名（默认动漫）');
   ok(!/无细节图|全部视图|已过期|角色描述|未生成|锚点已确认/.test(en), '英文报告里没有残留的中文界面文案');
   ok(en.includes('十六岁采茶姑娘'), '数据内容保持原文（角色描述是中文写的就还是中文）');
+  const thaiHtml = renderHtml([{ asset: assetFromIntake(THAI_INTAKE), assetDir: TMP }], TMP);
+  ok(thaiHtml.includes('<html lang="th">') && thaiHtml.includes('ภาพอ้างอิงตัวละคร') && thaiHtml.includes('มุมมองทั้งหมด'), '泰文资产默认渲染完整泰文报告界面');
+  ok(thaiHtml.includes('หญิงขายดอกไม้อายุยี่สิบสี่ปี'), '泰文报告保留泰文角色内容');
   const uiFile = join(TMP, 'ui-fr.json');
   writeFileSync(uiFile, JSON.stringify({ ...uiTemplate('fr'), title: 'Références de personnage' }));
   ok(run('render', assetPath, '--lang', 'fr', '--out', outEn).status !== 0, '非内置语言没给 ui：render 报错，不出半中半英的报告');

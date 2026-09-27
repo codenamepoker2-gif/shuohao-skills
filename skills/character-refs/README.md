@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-8b1a1a?style=for-the-badge)](README.md)
 [![English](https://img.shields.io/badge/English-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![关注作者 X](https://img.shields.io/badge/%E5%85%B3%E6%B3%A8%E4%BD%9C%E8%80%85-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # character-refs
@@ -91,8 +92,8 @@ node scripts/character-refs.mjs gen 阿禾/asset.json detail-neck --model codex 
 ## 报告
 
 `render` 出一张双击就能开的 HTML：一档只有一张卡片；二档起是设定图版面（左大头照，右上正面 / 侧面 / 背面，右下细节条），
-默认不显示细节图，页面上一键切换。过期的图标红框，页面顶部有图例，鼠标移上去能看到原因。界面内置中文、英文、日文（`render --lang en`），其他语言由 agent 现场翻一份文案；
-角色描述保持原文，提示词永远英文。版面由代码排，不生成拼接大图——拼接图当参考图，模型会把人画小。
+默认不显示细节图，页面上一键切换。过期的图标红框，页面顶部有图例，鼠标移上去能看到原因。界面内置中文、泰文、英文、日文（`render --lang th` / `--lang en`），其他语言由 agent 现场翻一份文案；
+角色内容语言用 intake 顶层的 `contentLang` 单独指定（`zh` / `th` / `en` / `ja`，默认 `zh`），泰文长度校验不计组合元音与声调符号；角色描述保持原文，提示词永远英文。版面由代码排，不生成拼接大图——拼接图当参考图，模型会把人画小。
 
 ## 命令行直接使用
 
@@ -117,7 +118,7 @@ scripts/
   core.mjs                  视图、提示词、输入校验、版本与过期、检查门
   models.mjs                四个出图适配器
   looks.mjs                 画风预设表（写实、动漫）
-  i18n.mjs                  报告与确认表的界面文案（中英日）
+  i18n.mjs                  报告与确认表的界面文案（中泰英日）
   png.mjs                   PNG 读写与元数据（零依赖）
   selftest.mjs              自测，不调模型
 references/
@@ -128,6 +129,7 @@ references/
 examples/
   阿禾-描述.txt              一句话描述
   阿禾-intake.json           拆好的输入
+  มะลิ-intake.json           泰文输入（泰文界面与泰文内容示例）
 assets/
   report.webp               报告截图（阿禾，锚点 GPT、其余 Qwen）
 ```
@@ -138,7 +140,7 @@ assets/
 node scripts/selftest.mjs
 ```
 
-230 项断言，不调模型、不花额度，Qwen 和 GPT Image 使用本地假服务器校验请求格式，完整流程使用自定义命令造的白底图跑通。
+241 项断言，覆盖泰文界面与泰文内容校验，不调模型、不花额度，Qwen 和 GPT Image 使用本地假服务器校验请求格式，完整流程使用自定义命令造的白底图跑通。
 
 ## 已知短板
 

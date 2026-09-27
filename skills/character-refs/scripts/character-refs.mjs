@@ -41,8 +41,8 @@ export const safeName = (s) => String(s).trim().replace(/[\s/\\:*?"<>|·]+/g, '-
 export const INTAKE_TEMPLATE = {
   _说明: [
     '用户一次性描述角色，由你（模型）拆进下面各字段；缺的自动补，并如实标 source：stated 原话 / inferred 推断 / default 默认。',
-    'lang 是确认表和报告的语言，照用户说话的语言填（zh / en / ja 内置；其他语言先运行 ui-template <lang> 翻一份放进 ui 字段）。',
-    'en 进出图提示词，永远英文：不写角色名、不写画风词、不写 (inferred) 之类标记；text 给人看，用 lang 指定的语言写。',
+    'lang 是确认表和报告的界面语言（zh / th / en / ja 内置）；contentLang 是角色内容语言（zh / th / en / ja，默认 zh）。',
+    'en 进出图提示词，永远英文：不写角色名、不写画风词、不写 (inferred) 之类标记；text 给人看，用 contentLang 指定的语言写。',
     '年龄、性别、年代推不出来就问用户——只有这三样不许自己编。',
     'build / skin / backCue 可省：皮肤按年龄给缺省，背面按发型与服装拼。',
     '细节图（最多 8 个）怎么挑：用户点名的优先（source: stated）；没点名就挑这个角色最能认出来的地方（配饰、腰间挂的东西、特别的鞋……）；',
@@ -55,6 +55,7 @@ export const INTAKE_TEMPLATE = {
   ],
   name: '角色名（只用于文件名与报告，不进提示词）',
   lang: 'zh',
+  contentLang: 'zh',
   source: '出处，可省',
   identity: { age: 19, gender: 'female', en: 'A slender nineteen-year-old Chinese young woman, 1930s Republican-era China', text: '19 岁女学生，民国', source: 'stated' },
   face: { en: 'Oval face with soft rounded cheeks, large dark wary eyes, straight fine eyebrows, thin lips', text: '鹅蛋脸……', source: 'stated' },
@@ -309,7 +310,7 @@ const USAGE = `character-refs.mjs —— 角色参考图
   check <asset.json> [--outfit id]         检查门与过期；有问题 exit 1
   render <asset.json>... [--out report.html] [--lang 代码] [--ui ui.json]
                                            出报告（默认不显示细节图，页面上可切换）；语言默认取资产的 lang
-  ui-template <语言代码>                   非内置语言（zh / en / ja 之外）的界面文案骨架，翻译后放进 intake 的 ui
+  ui-template <语言代码>                   非内置语言（zh / th / en / ja 之外）的界面文案骨架，翻译后放进 intake 的 ui
 
 视图：front-full（锚点，第一档） face-front side-full back-full（第二档）
       detail-hair detail-neck detail-sleeve detail-feet（第三档） face-45（第四档）`;

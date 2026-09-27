@@ -3,8 +3,8 @@
 //
 // 每个预设：
 //   id       稳定的英文 id，写进资产
-//   names    命令行认的名字（中英日都行，不分大小写）
-//   label    给人看的名字 { zh, en, ja }
+//   names    命令行认的名字（中英泰日都行，不分大小写）
+//   label    给人看的名字 { zh, th, en, ja }
 //   medium   'photo'（照片：角色的皮肤层进提示词）| 'drawn'（画出来的：不写毛孔、颗粒这类照片质感）
 //   style / clean / neg   拼进提示词的三段英文
 //
@@ -14,8 +14,8 @@
 // 统一写「泛红、小瑕疵」会把 19 岁的角色画成病容（实测）。不写 photorealistic：它会把画面往 CG 渲染带。
 const REALISTIC = {
   id: 'realistic-photo',
-  names: ['realistic-photo', 'realistic', 'photo', '写实', '写实照片', '真人', '実写'],
-  label: { zh: '写实照片', en: 'Realistic photo', ja: '写実写真' },
+  names: ['realistic-photo', 'realistic', 'photo', '写实', '写实照片', '真人', 'ภาพถ่ายสมจริง', 'สมจริง', '実写'],
+  label: { zh: '写实照片', th: 'ภาพถ่ายสมจริง', en: 'Realistic photo', ja: '写実写真' },
   medium: 'photo',
   style: 'A real photograph, not a render: shot on a full-frame digital camera with an 85mm portrait lens at f/5.6, natural true-to-life ' +
     "colors and white balance. Natural skin texture with the pores and fine lines the person's age calls for, a no-makeup look, " +
@@ -29,8 +29,8 @@ const REALISTIC = {
 // 动漫：日式电视动画的角色设定稿质感。不写 model sheet / turnaround——写了模型会在一张图里画多个视图。
 const ANIME = {
   id: 'anime',
-  names: ['anime', 'cartoon', '动漫', '卡通', '動漫', '二次元', 'アニメ'],
-  label: { zh: '动漫', en: 'Anime', ja: 'アニメ' },
+  names: ['anime', 'cartoon', '动漫', '卡通', '動漫', '二次元', 'แอนิเมะ', 'การ์ตูน', 'アニメ'],
+  label: { zh: '动漫', th: 'แอนิเมะ', en: 'Anime', ja: 'アニメ' },
   medium: 'drawn',
   style: 'A clean 2D Japanese anime illustration, like official character art for a TV anime: crisp confident line art of even weight, ' +
     'cel shading with one soft shadow tone and a few sharp highlights, flat clean colors, anime-style eyes with clear highlights, ' +

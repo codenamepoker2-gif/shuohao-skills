@@ -78,6 +78,9 @@ const FACE_NEG = BASE_NEG + ', waist, torso, arms, hands, full body, legs, feet,
 /* 小工具                                                                */
 /* ------------------------------------------------------------------ */
 export const CJK = /[㐀-鿿぀-ヿ가-힯]/;
+export const THAI = /[฀-๿]/;
+const THAI_BASE = /[ก-ฮะาำเ-ๅ]/;
+const THAI_COMBINING = /[ัิ-ฺ็-๎]/g;
 export const sha256 = (x) => createHash('sha256').update(x).digest('hex');
 const sentence = (s) => {
   const t = String(s ?? '').trim();
@@ -91,6 +94,11 @@ const lowerFirst = (s) => { const t = clause(s); return /^[A-Z][a-z]/.test(t) &&
 const en = (field) => clause(field?.en ?? field);
 /** 给人看的那段描述：新字段 text，旧输入的 zh 照样认。 */
 export const human = (field) => String(field?.text ?? field?.zh ?? '').trim();
+/** ภาษาไทยไม่นับสระและวรรณยุกต์แบบ combining เมื่อวัดความยาว */
+export const contentLength = (value, contentLang = 'zh') => {
+  const text = String(value ?? '').normalize('NFC');
+  return [...(contentLang === 'th' ? text.replace(THAI_COMBINING, '') : text)].length;
+};
 
 export function pronouns(gender) {
   return gender === 'male' ? { s: 'he', o: 'him', p: 'his' } : { s: 'she', o: 'her', p: 'her' };
@@ -254,15 +262,20 @@ const STYLE_WORDS = /\b(photo-?realistic|hyper-?realistic|anime|manga|cartoon|il
 
 export function intakeProblems(x) {
   const p = [];
+  const contentLang = x?.contentLang ?? 'zh';
   const need = (f, label) => {
     if (!f || typeof f !== 'object') { p.push(`缺 ${label}`); return; }
     if (!String(f.en ?? '').trim()) p.push(`${label} 缺英文（en）——出图用英文`);
     if (!human(f)) p.push(`${label} 缺给人看的描述（text，用 lang 指定的语言）——确认表和报告要用`);
     if (f.source && !SOURCES[f.source]) p.push(`${label} 的 source 只能是 ${Object.keys(SOURCES).join(' / ')}`);
     if (CJK.test(String(f.en ?? ''))) p.push(`${label} 的英文里混了中日韩字符`);
+    if (THAI.test(String(f.en ?? ''))) p.push(`${label} 的英文里混了泰文字符`);
     if (STYLE_WORDS.test(String(f.en ?? ''))) p.push(`${label} 写了画风词（${String(f.en).match(STYLE_WORDS)[0]}）——画风由项目画风层统一加，角色描述里不写`);
     if (x?.name && String(f.en ?? '').includes(x.name)) p.push(`${label} 的英文里出现了角色名——出图提示词禁人名`);
     if (/\((inferred|推断)\)/i.test(String(f.en ?? ''))) p.push(`${label} 的英文里写了推断标记——标记只进确认表，写进提示词会被画出来`);
+    const text = human(f);
+    if (contentLang === 'en' && (CJK.test(text) || THAI.test(text))) p.push(`${label} 的 text 应为英文`);
+    if (contentLang === 'th' && (!THAI_BASE.test(text) || CJK.test(text))) p.push(`${label} ของ text ควรเป็นภาษาไทย`);
   };
   if (!String(x?.name ?? '').trim()) p.push('缺 name（角色名）');
   const lang = x?.lang ?? 'zh';
@@ -271,6 +284,7 @@ export function intakeProblems(x) {
     const miss = uiMissing(x?.ui);
     if (miss.length) p.push(`lang ${lang} 不是内置语言（${BUILTIN.join(' / ')}），要带完整的 ui（运行 ui-template ${lang} 翻译后放进 ui 字段）；缺 ${miss.length} 项，如 ${miss.slice(0, 3).join('、')}`);
   }
+  if (!['zh', 'th', 'en', 'ja'].includes(contentLang)) p.push(`contentLang ต้องเป็น zh / th / en / ja แต่ได้รับ ${contentLang}`);
   const id = x?.identity;
   need(id, 'identity 身份');
   if (id) {
@@ -344,6 +358,7 @@ export function assetFromIntake(intake, look = DEFAULT_LOOK) {
     name: x.name,
     ...(x.source ? { source: x.source } : {}),
     lang: x.lang ?? 'zh',                   // 确认表与报告的语言；提示词永远英文
+    contentLang: x.contentLang ?? 'zh',     // 人类可读的角色内容语言；与界面语言分开
     ...(x.ui ? { ui: x.ui } : {}),          // 非内置语言的自译文案
     layers,
     outfits: {

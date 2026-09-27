@@ -1,0 +1,68 @@
+{
+  "name": "มะลิ",
+  "lang": "th",
+  "contentLang": "th",
+  "source": "ตัวอย่าง · สวนมะลิ",
+  "identity": {
+    "age": 24,
+    "gender": "female",
+    "en": "A slender twenty-four-year-old Thai flower seller in 1960s Bangkok",
+    "text": "หญิงขายดอกไม้อายุยี่สิบสี่ปีในกรุงเทพฯ ช่วงทศวรรษ 1960",
+    "source": "stated"
+  },
+  "face": {
+    "en": "An oval face, warm brown skin, alert almond-shaped dark eyes, straight brows, and a small dimple in her left cheek",
+    "text": "ใบหน้ารูปไข่ ผิวสีน้ำผึ้ง ดวงตาเรียวสีเข้ม คิ้วตรง และมีลักยิ้มเล็กที่แก้มซ้าย",
+    "source": "stated"
+  },
+  "hair": {
+    "en": "Long black hair gathered into a low bun with a single white jasmine garland pinned above it",
+    "text": "ผมดำยาวเกล้าเป็นมวยต่ำ ประดับพวงมาลัยดอกมะลิสีขาวหนึ่งพวง",
+    "source": "stated"
+  },
+  "build": {
+    "en": "Slender and upright from carrying flower baskets through the market every day",
+    "text": "รูปร่างเพรียวและยืนตัวตรงจากการหิ้วตะกร้าดอกไม้ในตลาดทุกวัน",
+    "source": "inferred"
+  },
+  "outfit": {
+    "id": "default",
+    "label": "ชุดขายดอกไม้",
+    "top": {
+      "en": "a fitted pale blue cotton blouse with short sleeves and small mother-of-pearl buttons",
+      "text": "เสื้อฝ้ายสีฟ้าอ่อนเข้ารูป แขนสั้น ติดกระดุมมุกเม็ดเล็ก",
+      "source": "stated"
+    },
+    "bottom": {
+      "en": "a dark navy ankle-length wrap skirt and simple brown leather sandals",
+      "text": "ผ้าถุงสีน้ำเงินเข้มยาวถึงข้อเท้าและรองเท้าแตะหนังสีน้ำตาลเรียบ ๆ",
+      "source": "inferred"
+    },
+    "details": [
+      {
+        "slot": "hair",
+        "en": "the white jasmine garland pinned above her low black hair bun",
+        "text": "พวงมาลัยดอกมะลิสีขาวเหนือมวยผมต่ำ",
+        "source": "stated"
+      },
+      {
+        "slot": "neck",
+        "en": "the rounded collar and first two mother-of-pearl buttons of her pale blue cotton blouse",
+        "text": "ปกเสื้อทรงมนและกระดุมมุกสองเม็ดแรกของเสื้อฝ้ายสีฟ้าอ่อน",
+        "source": "inferred"
+      },
+      {
+        "slot": "sleeve",
+        "en": "the neatly hemmed short sleeve of her pale blue cotton blouse",
+        "text": "ปลายแขนเสื้อสั้นสีฟ้าอ่อนที่เย็บริมอย่างเรียบร้อย",
+        "source": "inferred"
+      },
+      {
+        "slot": "feet",
+        "en": "simple brown leather sandals below the dark navy wrap skirt",
+        "text": "รองเท้าแตะหนังสีน้ำตาลใต้ชายผ้าถุงสีน้ำเงินเข้ม",
+        "source": "inferred"
+      }
+    ]
+  }
+}

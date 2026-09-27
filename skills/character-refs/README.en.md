@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # character-refs
@@ -70,7 +71,7 @@ Checked in code; `check` exits 1 on failure: side length 300–5760 px, aspect r
 
 ## Report
 
-`render` writes a self-contained HTML page: a single card at tier 1, a character-sheet layout from tier 2 (headshot on the left, front / profile / back top right, detail strip bottom right), details hidden by default with a one-click toggle. Stale images get a red outline, explained by a legend at the top; hover over one to see why. The layout is done in code rather than generated as one composite image — a composite used as a reference makes models draw the person smaller. The report UI ships in Chinese, English and Japanese (`render --lang en`); for any other language the agent translates the UI strings on the spot. Character descriptions stay as written, and image prompts are always English.
+`render` writes a self-contained HTML page: a single card at tier 1, a character-sheet layout from tier 2 (headshot on the left, front / profile / back top right, detail strip bottom right), details hidden by default with a one-click toggle. Stale images get a red outline, explained by a legend at the top; hover over one to see why. The layout is done in code rather than generated as one composite image — a composite used as a reference makes models draw the person smaller. The report UI ships in Chinese, Thai, English and Japanese (`render --lang th` / `--lang en`); for any other language the agent translates the UI strings on the spot. Character content language is set separately with `contentLang` at the top of the intake (`zh` / `th` / `en` / `ja`, default `zh`); Thai length checks ignore combining vowel and tone marks. Character descriptions stay as written, and image prompts are always English.
 
 ## Command line
 
@@ -92,7 +93,7 @@ node scripts/character-refs.mjs render out/阿禾/asset.json --out out/character
 node scripts/selftest.mjs
 ```
 
-230 assertions, no model calls, no quota. The Qwen and GPT Image adapters are checked against local mock servers; the full pipeline runs end to end with a custom command that produces blank white images.
+241 assertions, covering the Thai UI and Thai content validation; no model calls, no quota. The Qwen and GPT Image adapters are checked against local mock servers; the full pipeline runs end to end with a custom command that produces blank white images.
 
 ## Known limitations
 
