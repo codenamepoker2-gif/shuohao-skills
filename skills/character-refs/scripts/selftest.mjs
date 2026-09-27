@@ -530,5 +530,17 @@ const serve = (handler) => new Promise((ok_) => {
   ok(one.includes('还没有锚点') && one.includes('第 0 档'), '一张图都没有时也能渲染');
 }
 
+{
+  // Round 3 修复二收尾：质量门文案走 i18n 表（不是 zh detail 直出），
+  // th/en 的门标签和过期状态文案必须一个中文字都没有。
+  const CJK = /[㐀-鿿]/;
+  for (const lang of ['th', 'en']) {
+    const ui = uiFor(lang);
+    const gateValues = Object.values(ui.gates).join(' ');
+    ok(!CJK.test(gateValues), `${lang} 质量门标签全部无 CJK`);
+    ok(!CJK.test([ui.stNone, ui.stStale, ui.stGate].join(' ')), `${lang} 过期状态文案无 CJK`);
+  }
+}
+
 rmSync(TMP, { recursive: true, force: true });
 console.log(`✓ ${passed} 项自测全部通过`);

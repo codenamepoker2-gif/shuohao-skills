@@ -22,6 +22,7 @@ import {
   detectChapters,
   fmtEps,
   gateReport,
+  gateText,
   isSkippedGate,
   primarySceneCap,
   renderHtml,
@@ -851,6 +852,63 @@ ok(enMd.includes('**[Hook]**') && !enMd.includes('**【钩子】**'), 'EN MD 钩
   ok(!g2.ok, '2 集大纲 major 在末集照常失败');
   ok(g2.detail.includes('最早在第 2 集'), '2 集失败 detail 保持原文');
   ok(!isSkippedGate(g2), '失败门不算跳过');
+}
+
+/* ---------------- 门 detail 不再漏中文（Round 3 修复二） ---------------- */
+
+{
+  // 全模板覆盖：gateReport 产出的每一种 detail 模板 × th/en，结果不得含 CJK。
+  // 数据性名词（场景名、ID、泰文风险词）不属于界面文案，允许是内容语言。
+  const cases = [
+    { id: 'lead-cap', label: '主角组 1–5 人', detail: '3 位' },
+    { id: 'lead-cap', label: 'x', detail: '0 位' },
+    { id: 'support-cap', label: 'x', detail: '2 位' },
+    { id: 'functional-cap', label: 'x', detail: '1 位' },
+    { id: 'scene-cap', label: '主场景 ≤ 5', detail: '7 个' },
+    { id: 'prop-cap', label: '叙事道具 ≤ 8 件', detail: '9 件' },
+    { id: 'prop-cap', label: 'x', detail: '大纲没有 props 字段，跳过' },
+    { id: 'once-scene', label: 'x', detail: '缺：ชายหาด' },
+    { id: 'beat-gap', label: 'x', detail: '开头 2 集真空' },
+    { id: 'beat-gap', label: 'x', detail: '第 3–5 集之间断档' },
+    { id: 'beat-gap', label: 'x', detail: '结尾 2 集真空' },
+    { id: 'major-early', label: 'x', detail: '最早在第 6 集' },
+    { id: 'major-early', label: 'x', detail: '没有 major 爽点' },
+    { id: 'ep-fields', label: 'x', detail: '缺栏：第 1、3 集' },
+    { id: 'crowd-plan', label: 'x', detail: '缺：第 1、3 集' },
+    { id: 'risk-flag', label: 'x', detail: '第 2 集缺「雨戏」；第 4 集缺「人群」；第 4 集缺「手部特写」' },
+    { id: 'risk-flag', label: 'x', detail: '第 2 集缺「ฝนในฉาก」' },
+    { id: 'refs', label: 'x', detail: '第 2 集引用了不存在的场景 S02；爽点 B09 落在不存在的第 7 集；角色 C99 从未在任何一集出现；场景 S99 从未被用到；道具 P99 从未在任何一集出现；道具 P01 关联了不存在的爽点 B09' },
+    { id: 'refs', label: 'x', detail: '第 2 集引用了不存在的角色 C99；第 2 集引用了不存在的道具 P99' },
+    { id: 'no-dialogue', label: 'x', detail: '第 1、3 集出现引号' },
+  ];
+  const CJK = /[㐀-鿿]/;
+  for (const lang of ['th', 'en']) {
+    for (const c of cases) {
+      const gt = gateText(c, lang);
+      ok(!CJK.test(gt.label), `门 label 本地化 [${lang}] ${c.id} (${c.detail})`);
+      const detail = c.detail2 ?? c.detail;
+      ok(!CJK.test(gt.detail), `门 detail 本地化 [${lang}] ${c.id}: ${c.detail}`);
+    }
+  }
+
+  // 渲染层集成：弄坏几道门后渲染 th/en 报告，门列表与失败提示里不得有 CJK。
+  // 刻意挑 detail 只含集号/ID/可译风险词的门，数据性名词不掺进来。
+  const broken = clone();
+  broken.beats = [structuredClone(FIXTURE.beats[3])];
+  broken.beats[0].weight = 'major'; // major-early 失败：最早在第 6 集
+  broken.episodes[0].hook = ''; // ep-fields 失败：缺栏：第 1 集
+  broken.episodes[1].crowdPlan = ''; // crowd-plan 失败：缺：第 2 集
+  broken.episodes[1].propIds.push('P99'); // refs 失败：第 2 集引用了不存在的道具 P99
+  broken.episodes[0].synopsis += '落雨'; // risk-flag 失败：第 1 集缺「雨戏」
+  const thBroken = renderHtml(broken, 'th');
+  const enBroken = renderHtml(broken, 'en');
+  const gateTextOf = (html) =>
+    [...html.matchAll(/<ul class="gate">([\s\S]*?)<\/ul>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ')).join('\n');
+  ok(!CJK.test(gateTextOf(thBroken)), 'th 报告门列表无 CJK（含失败 detail 与跳过说明）');
+  ok(!CJK.test(gateTextOf(enBroken)), 'en 报告门列表无 CJK（含失败 detail 与跳过说明）');
+  const galertOf = (html) => [...html.matchAll(/<div class="galert">([\s\S]*?)<\/div>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ')).join('\n');
+  ok(!CJK.test(galertOf(thBroken)) && galertOf(thBroken).length > 0, 'th 失败提示条无 CJK');
+  ok(!CJK.test(galertOf(enBroken)) && galertOf(enBroken).length > 0, 'en 失败提示条无 CJK');
 }
 
 eq(DEFAULT_PER_VOLUME, 15, '默认每卷 15 章');

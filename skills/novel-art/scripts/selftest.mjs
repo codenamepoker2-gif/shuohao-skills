@@ -547,4 +547,26 @@ eq(FIXTURE.props.length, 2, '样例带两件叙事道具');
   eq(checked.status, 0, 'checkup ภาษาไทยทำงานสำเร็จ');
   ok(checked.stdout.includes('ผ่านทั้งหมด') && !checked.stdout.includes('全部通过'), 'สรุปผล CLI ภาษาไทยไม่มีข้อความจีน');
 }
+{
+  // Round 3 修复二：泰文样例渲染成 th/en 报告，质量门面板不得漏中文。
+  // 美术门的失败 detail 在 th/en 报告里是通用替代文案，逐字数据只留在 CLI。
+  const d = clone();
+  d.lang = 'th';
+  d.contentLang = 'th';
+  d.source = 'คืนที่ท่าเรือ';
+  d.scenes.forEach((s, i) => {
+    s.name = `ฉาก${i + 1}`;
+    s.summary = 'พื้นที่นี้เก็บร่องรอยของเรื่องราว';
+  });
+  d.props.forEach((pr, i) => { pr.name = `อุปกรณ์${i + 1}`; pr.summary = 'หลักฐานสำคัญของเรื่อง'; });
+  d.scenes[0].anchors = []; // 击穿 anchors 门
+  const gateTextOf = (h) =>
+    [...h.matchAll(/<ul class="gate">([\s\S]*?)<\/ul>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ')).join('\n');
+  const CJK = /[㐀-鿿]/;
+  const thHtml = renderHtml(d);
+  const enHtml = renderHtml(d, 'en');
+  ok(gateTextOf(thHtml).length > 0 && gateTextOf(enHtml).length > 0, '质量门面板真的渲染了出来');
+  ok(!CJK.test(gateTextOf(thHtml)), 'th 报告质量门面板无 CJK（泰文样例击穿 anchors 门后）');
+  ok(!CJK.test(gateTextOf(enHtml)), 'en 报告质量门面板无 CJK（泰文样例击穿 anchors 门后）');
+}
 console.log(`✓ ${passed} 项自测全部通过`);

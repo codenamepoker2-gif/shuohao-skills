@@ -893,4 +893,15 @@ ok(promptContainsCharacterName('老周的设定图', '老周', 'zh'), '中文继
   ok(helpEn.stdout.includes('deterministic character tools') && !/[\u3400-\u9fff]/u.test(helpEn.stdout), '英文帮助没有中文界面文案');
 }
 
+{
+  // Round 3 修复二收尾：本 skill 没有质量门，泰文样例的 th/en 报告里
+  // 不该出现任何质量门面板——「门 detail 无中文」在这里以「无门区块」成立。
+  const thCast = JSON.parse(readFileSync(join(examples, 'สะพาน-cast.json'), 'utf8')).characters;
+  const thHtml = renderHtml(thCast, 'สะพาน', '', 'th');
+  const enHtml = renderHtml(thCast, 'สะพาน', '', 'en');
+  ok(!thHtml.includes('<ul class="gate">'), 'th 报告没有质量门面板（本 skill 无门）');
+  ok(!enHtml.includes('<ul class="gate">'), 'en 报告没有质量门面板（本 skill 无门）');
+  ok(!thHtml.includes('质量门') && !enHtml.includes('gatePill'), '报告界面不残留质量门字样');
+}
+
 console.log(`✓ ${passed} 项自测全部通过`);

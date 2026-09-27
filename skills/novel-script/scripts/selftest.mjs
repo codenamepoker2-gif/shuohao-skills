@@ -501,4 +501,18 @@ ok(html.includes('lang="zh"'), '默认报告 html lang 是 zh');
   eq(badUsage.status, 1, 'คำสั่งที่ขาดไฟล์จบด้วยสถานะผิดพลาด');
   ok(badUsage.stderr.includes('วิธีใช้:') && !/[\u3400-\u9fff]/.test(badUsage.stderr), 'ข้อความวิธีใช้เมื่อผิดพลาดเป็นภาษาไทยทั้งหมด');
 }
+{
+  // Round 3 修复二：击穿一道门后渲染 th/en 报告，质量门面板不得漏中文。
+  // 剧本门的失败 detail 在 th/en 报告里是通用替代文案，逐字数据只留在 CLI。
+  const broken = JSON.parse(JSON.stringify(FIXTURE));
+  delete broken.episodes[0].cliff; // hook-cliff 失败
+  const gateTextOf = (h) =>
+    [...h.matchAll(/<ul class="gate">([\s\S]*?)<\/ul>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ')).join('\n');
+  const CJK = /[㐀-鿿]/;
+  const thHtml = renderHtml(broken, { ...CTX, lang: 'th' });
+  const enHtml = renderHtml(broken, { ...CTX, lang: 'en' });
+  ok(!CJK.test(gateTextOf(thHtml)), 'th 报告质量门面板无 CJK（击穿 hook-cliff 后）');
+  ok(!CJK.test(gateTextOf(enHtml)), 'en 报告质量门面板无 CJK（击穿 hook-cliff 后）');
+  ok(gateTextOf(thHtml).length > 0 && gateTextOf(enHtml).length > 0, '质量门面板真的渲染了出来');
+}
 console.log(`✓ ${passed} 项自测全部通过`);

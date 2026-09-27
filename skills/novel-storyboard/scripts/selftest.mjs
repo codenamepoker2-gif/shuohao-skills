@@ -1020,4 +1020,18 @@ ok(html.includes('老周'), 'html 里 ID 换成名字');
   eq(en.status, 0, 'English validate succeeds through the CLI');
   ok(en.stdout.includes('passed validation') && en.stdout.includes('segments /') && !/[㐀-鿿]/.test(en.stdout), 'English validate summary contains no Chinese UI text');
 }
+{
+  // Round 3 修复二：击穿一道门后渲染 th/en 报告，质量门面板不得漏中文。
+  // 分镜门的失败 detail 在 th/en 报告里是通用替代文案，逐字数据只留在 CLI。
+  const broken = JSON.parse(JSON.stringify(FIXTURE));
+  broken.episodes[0].segments[0].id = 'BAD-01'; // id 门失败：段 id 不再符合 E??-?? 约定
+  const gateTextOf = (h) =>
+    [...h.matchAll(/<ul class="gate">([\s\S]*?)<\/ul>/g)].map((m) => m[1].replace(/<[^>]+>/g, ' ')).join('\n');
+  const CJK = /[㐀-鿿]/;
+  const thHtml = renderHtml(broken, { ...CTX, lang: 'th' });
+  const enHtml = renderHtml(broken, { ...CTX, lang: 'en' });
+  ok(gateTextOf(thHtml).length > 0 && gateTextOf(enHtml).length > 0, '质量门面板真的渲染了出来');
+  ok(!CJK.test(gateTextOf(thHtml)), 'th 报告质量门面板无 CJK（击穿 id 门后）');
+  ok(!CJK.test(gateTextOf(enHtml)), 'en 报告质量门面板无 CJK（击穿 id 门后）');
+}
 console.log(`✓ ${passed} 项自测全部通过`);

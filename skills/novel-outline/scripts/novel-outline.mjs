@@ -670,6 +670,7 @@ const GATE_SKIPS_EN = {
     '未提供 outline/cast，本门跳过（视为通过）': 'outline/cast not provided — gate skipped (treated as passing)',
     '未提供 cast.json，本门跳过（视为通过）': 'cast.json not provided — gate skipped (treated as passing)',
     '只有 1 集，不适用': 'Single-episode outline — not applicable',
+    '大纲没有 props 字段，跳过': 'outline.json has no props field — gate skipped',
 };
 const GATE_SKIPS_TH = {
     '未提供 outline.json，本门跳过（视为通过）': 'ไม่ได้รับ outline.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
@@ -678,40 +679,96 @@ const GATE_SKIPS_TH = {
     '未提供 outline/cast，本门跳过（视为通过）': 'ไม่ได้รับ outline/cast — ข้ามด่านนี้ (นับเป็นผ่าน)',
     '未提供 cast.json，本门跳过（视为通过）': 'ไม่ได้รับ cast.json — ข้ามด่านนี้ (นับเป็นผ่าน)',
     '只有 1 集，不适用': 'มีตอนเดียว จึงไม่ต้องตรวจข้อนี้',
+    '大纲没有 props 字段，跳过': 'โครงเรื่องไม่มีฟิลด์ props จึงข้ามด่านนี้',
 };
+/** 门 detail 的展示层翻译：模板碎片按表序整串替换（字符串规则整串替换，
+ * 正则自带 /g 全局替换）。表序即语义——专用模板在前，通用碎片在后。 */
+const localize = (text, table) => {
+  let out = String(text);
+  for (const [from, to] of table) out = typeof from === 'string' ? out.split(from).join(to) : out.replace(from, to);
+  return out;
+};
+
+/* 每道门的 detail 模板碎片 → 泰文。覆盖 gateReport 产出的全部模板：
+ * beat-gap 三种真空/断档、major-early 首次出现位置、ep-fields/crowd-plan 的
+ * 缺栏与缺方案、risk-flag 的缺预警、refs 全套引用错误、no-dialogue 引号、
+ * 三个数量 detail 与 zh 内容的风险词（zh 大纲也要出泰文报告）。 */
+const GATE_DETAIL_TH = [
+  [/开头\s*(\d+)\s*集真空/g, 'ไม่มีจุดพีคใน $1 ตอนแรก'],
+  [/第\s*(\d+)–(\d+)\s*集之间断档/g, 'ไม่มีจุดพีคระหว่างตอนที่ $1–$2'],
+  [/结尾\s*(\d+)\s*集真空/g, 'ไม่มีจุดพีคใน $1 ตอนท้าย'],
+  [/最早在第\s*(\d+)\s*集/g, 'จุดพีคใหญ่ครั้งแรกอยู่ที่ตอนที่ $1'],
+  ['没有 major 爽点', 'ไม่มีจุดพีคใหญ่'],
+  [/爽点\s*(\S+)\s*落在不存在的第\s*(\S+)\s*集/g, 'จุดพีค $1 อยู่ในตอนที่ $2 ที่ไม่มีอยู่จริง'],
+  [/道具\s*(\S+)\s*关联了不存在的爽点/g, 'อุปกรณ์ $1 อ้างอิงจุดพีคที่ไม่มีอยู่'],
+  [/第\s*([\d、]+)\s*集引用了不存在的场景/g, 'ตอนที่ $1 อ้างอิงฉากที่ไม่มีอยู่'],
+  [/第\s*([\d、]+)\s*集引用了不存在的角色/g, 'ตอนที่ $1 อ้างอิงตัวละครที่ไม่มีอยู่'],
+  [/第\s*([\d、]+)\s*集引用了不存在的道具/g, 'ตอนที่ $1 อ้างอิงอุปกรณ์ที่ไม่มีอยู่'],
+  [/角色\s*(\S+)\s*从未在任何一集出现/g, 'ตัวละคร $1 ไม่ปรากฏในตอนใดเลย'],
+  [/场景\s*(\S+)\s*从未被用到/g, 'ฉาก $1 ไม่เคยถูกใช้'],
+  [/道具\s*(\S+)\s*从未在任何一集出现/g, 'อุปกรณ์ $1 ไม่ปรากฏในตอนใดเลย'],
+  ['缺栏：', 'ขาดช่อง: '],
+  [/第\s*([\d、]+)\s*集出现引号/g, 'ตอนที่ $1 มีข้อความในเครื่องหมายคำพูด'],
+  [/第\s*([\d、]+)\s*集/g, 'ตอนที่ $1'],
+  ['缺：', 'ขาด: '],
+  ['缺「', 'ขาด「'],
+  [/ตอนที่ ([\d,]+)ขาด/g, 'ตอนที่ $1 ขาด'],
+  [/(\d+)\s*位/g, '$1 คน'],
+  [/(\d+)\s*个/g, '$1 รายการ'],
+  [/(\d+)\s*件/g, '$1 ชิ้น'],
+  // zh 内容的风险词：zh 大纲也要能出看得懂的泰文报告
+  ['「雨戏」', '「ฝนในฉาก」'],
+  ['「肢体接触」', '「สัมผัสร่างกาย」'],
+  ['「人群」', '「ฝูงชน」'],
+  ['「手部特写」', '「ภาพระยะใกล้ของมือ」'],
+  ['；', '; '],
+  [/(\d)、(?=\d)/g, '$1, '],
+];
+const GATE_DETAIL_EN = [
+  [/开头\s*(\d+)\s*集真空/g, 'no beat in the first $1 episodes'],
+  [/第\s*(\d+)–(\d+)\s*集之间断档/g, 'no beat between episodes $1–$2'],
+  [/结尾\s*(\d+)\s*集真空/g, 'no beat in the last $1 episodes'],
+  [/最早在第\s*(\d+)\s*集/g, 'first major beat lands in episode $1'],
+  ['没有 major 爽点', 'no major beats'],
+  [/爽点\s*(\S+)\s*落在不存在的第\s*(\S+)\s*集/g, 'beat $1 sits in nonexistent episode $2'],
+  [/道具\s*(\S+)\s*关联了不存在的爽点/g, 'prop $1 references nonexistent beat'],
+  [/第\s*([\d、]+)\s*集引用了不存在的场景/g, 'Episode $1 references a nonexistent scene'],
+  [/第\s*([\d、]+)\s*集引用了不存在的角色/g, 'Episode $1 references a nonexistent character'],
+  [/第\s*([\d、]+)\s*集引用了不存在的道具/g, 'Episode $1 references a nonexistent prop'],
+  [/角色\s*(\S+)\s*从未在任何一集出现/g, 'character $1 never appears in any episode'],
+  [/场景\s*(\S+)\s*从未被用到/g, 'scene $1 is never used'],
+  [/道具\s*(\S+)\s*从未在任何一集出现/g, 'prop $1 never appears in any episode'],
+  ['缺栏：', 'Missing fields: '],
+  [/第\s*([\d、]+)\s*集出现引号/g, 'Episode $1 contains quoted dialogue'],
+  [/第\s*([\d、]+)\s*集/g, 'Episode $1'],
+  ['缺：', 'Missing: '],
+  // zh 风险词在引号内，必须在引号改写规则之前整词替换
+  ['「雨戏」', '“rain scene”'],
+  ['「肢体接触」', '“physical contact”'],
+  ['「人群」', '“crowd”'],
+  ['「手部特写」', '“hand close-up”'],
+  ['缺「', 'missing “'],
+  ['」', '”'],
+  ['缺', 'missing '],
+  [/Episode ([\d,]+)missing/g, 'Episode $1 missing'],
+  [/(\d+)\s*位/g, '$1 people'],
+  [/(\d+)\s*个/g, '$1 items'],
+  [/(\d+)\s*件/g, '$1 props'],
+  ['；', '; '],
+  [/(\d)、(?=\d)/g, '$1, '],
+];
 /** 报告里的门文案：英文界面取映射，未命中或中文界面回落原文。 */
-const gateText = (g, lang) => {
+export const gateText = (g, lang) => {
   if (lang === 'zh') return { label: g.label, detail: g.detail };
   const translated = (lang === 'th' ? GATE_LABELS_TH : GATE_LABELS_EN)[g.enKey ?? g.id];
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
   const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
+  // detail 的展示层翻译：先查跳过类整串映射，未命中再按模板碎片表按序替换
+  //（顺序=先专用模板后通用碎片，先长后短；字符串规则整串替换，正则自带 /g）。
   const skipMap = lang === 'th' ? GATE_SKIPS_TH : GATE_SKIPS_EN;
-  let detail = lang === 'zh' ? g.detail : (skipMap[g.detail] ?? g.detail);
-  if (lang === 'th') {
-    detail = String(detail)
-      .replace(/^缺：/, 'ขาด: ')
-      .replaceAll('缺「', 'ขาด「')
-      .replace(/第\s*(\d+)\s*集/g, 'ตอนที่ $1')
-      .replace(/ตอนที่ (\d+)ขาด/g, 'ตอนที่ $1 ขาด')
-      .replace(/(\d+)\s*位/g, '$1 คน')
-      .replace(/(\d+)\s*个/g, '$1 รายการ')
-      .replace(/(\d+)\s*件/g, '$1 ชิ้น')
-      .replace('没有 major 爽点', 'ไม่มีจุดพีคใหญ่')
-      .replace('出现引号', 'มีข้อความในเครื่องหมายคำพูด');
-  } else if (lang === 'en') {
-    detail = String(detail)
-      .replace(/^缺：/, 'Missing: ')
-      .replaceAll('缺「', 'missing “')
-      .replaceAll('」', '”')
-      .replace(/第\s*(\d+)\s*集/g, 'Episode $1')
-      .replace(/Episode (\d+)missing/g, 'Episode $1 missing')
-      .replace(/(\d+)\s*位/g, '$1 people')
-      .replace(/(\d+)\s*个/g, '$1 items')
-      .replace(/(\d+)\s*件/g, '$1 props')
-      .replace('没有 major 爽点', 'no major beats')
-      .replace('出现引号', 'contains quoted dialogue');
-  }
+  const table = lang === 'th' ? GATE_DETAIL_TH : GATE_DETAIL_EN;
+  let detail = skipMap[g.detail] ?? localize(g.detail, table);
   return { label, detail };
 };
 
