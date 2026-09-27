@@ -4,9 +4,11 @@
 
 跟 H3 的差别不是措辞偏好，是协议：H3 靠正文把参考图钉到秒数上；Seedance 是一个「全模态导演」，把输入拆成空间层（画面里有什么）和时间层（怎么随时间变化），**时间层用镜头顺序表达，不用秒数**。
 
-## 语言：整条中文
+## 语言：整条中文或整条英文，不混排
 
-官方示例全部是中文，台词、音效、音乐的符号约定也是按中文设计的。整条正文写中文，运镜词用 `schema.md` 词表的中文词。**台词语言要统一，避免中英混用**（专有名词除外）。
+官方示例全部是中文，台词、音效、音乐的符号约定也是按中文设计的。zh 内容整条正文写中文，运镜词用 `schema.md` 词表的中文词。**台词语言要统一，避免中英混用**（专有名词除外）。
+
+**非中文内容（`contentLang: "th"` / `"en"`）整条换成英文，规则不变：**标签、字段值（走位、构图量化、音景、配乐、音效、光影）全部英文——官方「台词语言要统一，避免混用」的纪律从「不混中英」推广为「正文只用一种语言」。你写的字段保持内容语言，另加 `*Prompt` 英文对应字段（`shotPrompt`、`blockingPrompt`、`lensPrompt`……见 `schema.md`）；只喂英文、英文只喂模型。程序缺英文对应字段时**报错而不是静默丢语义**；全局约束（无字幕、禁双胞胎）也用官方中文约束的英文等价句。台词仍逐字进 `{}`，**保留说出来的那门语言**——这是整条英文正文里唯一允许的非英文文字，和 zh 模式里台词之外的中文一个道理。
 
 ## 官方进阶公式
 
@@ -36,13 +38,13 @@
 
 | 提示词里的位置 | 字段 |
 | --- | --- |
-| 「画面：」行 | 每切的 `shot`（中文，通用身份） |
-| 【人物关系与构图逻辑】 | 每段的 `blocking` |
-| 焦距 / 机位 / 构图 / 视线落点 / 焦点 / 稳定性 | 每切的 `lens` / `cameraPosition` / `composition` / `eyeline` / `focus` / `stability` |
-| 音效行、光影行 | 每切可选的 `sfx` / `lighting` |
-| `<音景>` / `（配乐）` | 每段的 `soundscape` / `music`（不带符号，程序套） |
-| 运镜、景别 | 每切的 `camera` / `size` 枚举，程序转成中文词 |
-| 台词 `{}` | 不用写——程序从剧本认领的节拍逐字取 |
+| 「画面：」/ `Visual:` 行 | 每切的 `shot`（内容语言，通用身份）；`contentLang` 非 zh 时用英文 `shotPrompt` |
+| 【人物关系与构图逻辑】/ `[CHARACTER BLOCKING AND COMPOSITION]` | 每段的 `blocking`；非 zh 内容用英文 `blockingPrompt` |
+| 焦距 / 机位 / 构图 / 视线落点 / 焦点 / 稳定性 | 每切的 `lens` / `cameraPosition` / `composition` / `eyeline` / `focus` / `stability`；非 zh 内容另加 `lensPrompt` / `cameraPositionPrompt` / `compositionPrompt` / `eyelinePrompt` / `focusPrompt` 英文对应字段 |
+| 音效行、光影行 | 每切可选的 `sfx` / `lighting`；非 zh 内容另加 `sfxPrompt` / `lightingPrompt` |
+| `<音景>` / `（配乐）` / `Soundscape:` / `Music:` | 每段的 `soundscape` / `music`（不带符号，程序套）；非 zh 内容另加 `soundscapePrompt` / `musicPrompt` |
+| 运镜、景别 | 每切的 `camera` / `size` 枚举，程序转成对应语言的词 |
+| 台词 `{}` | 不用写——程序从剧本认领的节拍逐字取，保留原语言 |
 
 `render --html` 的提示词面板有 Seedance 页签，`export --protocol seedance` 出投产包（每段 `seedance.md` + 附件，根部 `seedance-manifest.json`）。
 

@@ -45,7 +45,7 @@ Same stance as the other four skills in this repo: **a checklist the model grade
 | Frame-prompt hygiene | Chinese, non-empty (it names characters on purpose — a name points at the attached design sheet) |
 | No names in video prompts | the H3 body (in either language) and the Seedance shot text carry no character names or aliases — required by both official prompt guides. Checked with `--outline` / `--cast`; skipping is **announced** |
 | **Composition fields** | `blocking` per segment; lens / camera position / composition / eyeline / focus / stability per cut, stability from the enum |
-| **Seedance shot text** | every cut's `shot` is Chinese and non-empty, with no timings, shot numbers, image references, H3 markers or `{}` `<>` `（）` — the program adds those from the real structure |
+| **Seedance shot text** | every cut's `shot` matches the content language and is non-empty, with no timings, shot numbers, image references, H3 markers or `{}` `<>` `（）` — the program adds those from the real structure. With `contentLang: "th"` / `"en"` every cut also carries an English `shotPrompt` (and English `*Prompt` overrides for the composition fields) |
 | Reference integrity | scene index / characters / props all audited against the script scene |
 | **Shot recipe** (optional mount) | only checked with `--shots <cards dir>`: a cut's `recipe` id exists in the library, every must-phrase of that card appears in the cut's frame prompt, and a multi-cut recipe runs long enough. Without `--shots` the skip is **announced**; so is "no cut references a recipe" |
 
@@ -76,6 +76,8 @@ Pass `--no-log` to skip it. If the file cannot be written the step is skipped si
 ## The report
 
 A single-page, 1600px-wide review document. Reports ship with Chinese, Thai, and English UI; pass `--lang th` or `--lang en` to `render` (Chinese by default, or the storyboard.json top-level `lang` field — the flag wins). This only switches the UI labels — it is independent of `promptLang`, which controls the H3 prompt language (English by default). In every language mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored. Content language is set separately with `contentLang: "zh" | "th" | "en"` (default `zh`): Thai dialogue is timed at 13 base characters/second (combining vowel and tone marks ignored), Chinese keeps 4.5 chars/second.
+
+**Non-Chinese content keeps the model-facing output all-English.** With `contentLang: "th"` or `"en"`, every cut requires an English `shotPrompt` for the Seedance `Visual:` line and an English `frame` for image generation; `shot` stays in the story's language, and the composition fields (`blocking`, `lens`, `cameraPosition`, …) each take a paired English `*Prompt` override. The exporter renders labels, composition values, and the default constraints (no-subtitles, no-twins) in English, while dialogue keeps its spoken language inside the `{}` markers — the protocol's one allowed exception. See `references/schema.md` and `references/seedance-prompt.md`.
 
 - **KPI band**: segments / cuts with average length / total vs target / generation batches / segments carrying dialogue
 - **Cut rhythm strip** (the signature chart): one band per episode, **thick separators = segment boundaries (one generation each)**, slice width = cut duration share, color depth = shot size; click a slice to jump to its segment card
@@ -124,7 +126,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # per-se
 node scripts/selftest.mjs
 ```
 
-331 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, Thai content timing, rendering (all three report UI languages), H3 and Seedance export. No model calls, runs in about a second.
+346 assertions — beat expansion, H3 skeleton derivation, Seedance assembly, stats and batching, gate-defeating cases, recipe-card parsing and mounting, seed, Thai content timing, rendering (all three report UI languages), H3 and Seedance export. No model calls, runs in about a second.
 
 The bundled example (`examples/渡口-storyboard.json`) is a complete episode-1 storyboard — 10 segments, 34 cuts claiming all 35 script beats at ~3.5s per cut, 119s against a 120s target, 2 generation batches, every segment carrying a fully audited H3 prompt.
 

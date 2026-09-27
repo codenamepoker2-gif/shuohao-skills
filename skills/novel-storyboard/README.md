@@ -44,7 +44,7 @@
 | 分镜图提示词卫生 | 中文非空（直呼角色名——名字指向挂上去的设定图） |
 | 视频提示词不含角色名 | H3 正文（中英文模式都查）和 Seedance 镜头正文不许出现角色名与别名——H3 与 Seedance 官方规范的要求。给 `--outline` / `--cast` 才查，不给**明说跳过** |
 | **构图量化字段** | 每段有 `blocking`；每镜焦距／机位／构图／视线落点／焦点／稳定性齐全，稳定性在枚举里 |
-| **Seedance 镜头正文** | 每镜 `shot` 中文非空，不写秒数与时间码、镜头编号、图片引用、H3 标记和 `{}` `<>` `（）`——这些由程序按真实结构加 |
+| **Seedance 镜头正文** | 每镜 `shot` 语言与 `contentLang` 一致且非空，不写秒数与时间码、镜头编号、图片引用、H3 标记和 `{}` `<>` `（）`——这些由程序按真实结构加。`contentLang` 非 zh 时每镜另写英文 `shotPrompt` |
 | 引用对账 | 场次/人物/道具全部对账剧本该场 |
 | **镜头配方**（可选挂载） | 给了 `--shots <卡片目录>` 才查：cut 的 `recipe` id 在卡库里、卡片的每条必备短语出现在该切的分镜图提示词里、多格配方的连排格数够。不给 `--shots` **明说跳过**；给了但全篇没引用配方也明说 |
 
@@ -84,6 +84,7 @@ node scripts/novel-storyboard.mjs stats
 - **质量门**面板 + 页眉徽章 + **导出 JSON**（下载的就是 `storyboard.json` 原样）
 - 全部图形内联 CSS/SVG，零外部依赖，离线双击能开
 - 报告界面内置中、泰、英三语：`render --lang th` / `--lang en` 切换（默认中文，也可跟 storyboard.json 顶层 `lang` 字段，命令行优先）——只切界面标签，与 `promptLang`（H3 提示词语言，默认英文）互相独立。界面语言下质量门标签同样翻译（阈值原样），门的失败详情与数据内容保持原文。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`）：泰文台词按 13 个基础字符/秒折算时长（不计组合元音与声调符号），中文保持 4.5 字/秒
+- 非中文内容（`contentLang: "th"` / `"en"`）的模型提示词整条英文：每镜必写英文 `shotPrompt`（Seedance 的 `Visual:` 行）与英文 `frame`（图像模型），`shot` 保持内容语言；构图字段（`blocking`、`lens`、`cameraPosition` 等）逐项配 `*Prompt` 英文对应字段。导出的标签与默认约束（无字幕、禁双胞胎）同为英文，台词保留原语言进 `{}`。详见 `references/schema.md` 与 `references/seedance-prompt.md`
 
 ## 五个 skill 的接力（管线到此闭环）
 
@@ -133,7 +134,7 @@ node scripts/novel-storyboard.mjs export sb.json --script script.json   # H3 投
 SKILL.md                 给 agent 读的工作流
 scripts/
   novel-storyboard.mjs   seed / validate / checkup / render / export / slug
-  selftest.mjs           331 项断言，不调模型
+  selftest.mjs           346 项断言，不调模型
 references/
   schema.md              storyboard.json 结构 + 时长约束链
   h3-prompt.md           H3 提示词写法规范（官方方法论内化版）
@@ -152,6 +153,6 @@ assets/
 node scripts/selftest.mjs
 ```
 
-331 项断言，覆盖节拍展开 / H3 骨架推导 / Seedance 拼装 / 统计与批次 / 质量门逐项击穿 / 配方卡库解析与挂载 / seed / 泰文内容语言与折算 / 渲染（三语界面）/ H3 与 Seedance 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
+346 项断言，覆盖节拍展开 / H3 骨架推导 / Seedance 拼装 / 统计与批次 / 质量门逐项击穿 / 配方卡库解析与挂载 / seed / 泰文内容语言与折算 / 渲染（三语界面）/ H3 与 Seedance 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
 
 **只在 macOS + Node 24 上实测过。** 代码没有平台相关调用，Linux 和更低版本 Node 理论上没问题，但**没验过**。

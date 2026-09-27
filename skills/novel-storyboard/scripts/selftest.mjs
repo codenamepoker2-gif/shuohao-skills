@@ -4,11 +4,13 @@
 // 证明它真的会拦，不是一个永远为真的假测试。
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   CAMERA_MOVES,
+  containsBannedName,
   DEFAULT_PARAMS,
   exportPack,
   H3_I2VA_LINE,
@@ -32,7 +34,9 @@ import {
   renderHtml,
   renderMarkdown,
   SEEDANCE_NO_SUBTITLES,
+  SEEDANCE_NO_SUBTITLES_EN,
   SEEDANCE_NO_TWINS,
+  SEEDANCE_NO_TWINS_EN,
   seedancePrompt,
   seedFromScript,
   scriptLineChars,
@@ -155,11 +159,21 @@ for (const ep of THAI_BOARD.episodes) {
       cut.shot = 'หญิงสาวค่อย ๆ หันไปมองแม่น้ำ';
       cut.shotPrompt = 'A young woman slowly turns to look across the river.';
       cut.lens = '50mm';
+      cut.lensPrompt = '50mm standard lens with moderate depth of field';
       cut.cameraPosition = 'ระดับสายตา';
+      cut.cameraPositionPrompt = 'eye-level view of the young woman';
       cut.composition = 'กฎสามส่วน';
+      cut.compositionPrompt = 'rule-of-thirds composition';
       cut.eyeline = 'อีกฝั่งของแม่น้ำ';
+      cut.eyelinePrompt = 'the opposite bank of the river';
       cut.focus = 'ใบหน้าหญิงสาว';
+      cut.focusPrompt = 'lock focus on the young woman’s face';
+      if (cut.lighting) cut.lightingPrompt = 'soft motivated light from the river';
+      if (cut.sfx) cut.sfxPrompt = 'natural synchronized action sound';
       seg.blocking = 'หญิงสาวอยู่ด้านซ้ายของภาพและหันหน้าไปทางแม่น้ำ';
+      seg.blockingPrompt = 'The young woman stands on frame left, facing the river.';
+      if (seg.soundscape) seg.soundscapePrompt = 'Quiet water and distant wind.';
+      if (seg.music) seg.musicPrompt = 'A restrained, gentle score.';
       const [from, to] = cut.beats;
       const dialogue = scene.beats.slice(from - 1, to)
         .filter((b) => b.kind === 'line')
@@ -183,6 +197,32 @@ for (const ep of THAI_BOARD.episodes) {
   ok(THAI_BOARD.episodes[0].segments[0].h3Prompt.includes('<d>[Thai] ไปกันเถอะ</d>'), '泰文台词逐字进入带 Thai 标签的 H3 <d> 块');
   ok(gateReport(THAI_BOARD, { ...CTX, script: THAI_SCRIPT }).every((g) => g.ok), '泰文剧本到泰文分镜的十八道门端到端全部通过');
   eq(validateStoryboard(THAI_BOARD, { ...CTX, script: THAI_SCRIPT }).length, 0, '泰文故事通过完整分镜结构校验');
+}
+
+// Thai name matching is word-aware and exempts bounded lexical compounds.
+ok(containsBannedName('ต้นเดินเข้ามา', 'ต้น'), '泰文独立人名「ต้น」仍能检出');
+ok(!containsBannedName('ใต้ต้นไม้ริมทาง', 'ต้น'), '泰文普通词「ต้นไม้」不误报人名「ต้น」');
+ok(!containsBannedName('ในตอนต้นเรื่อง', 'ต้น'), '泰文普通词「ตอนต้น」不误报人名「ต้น」');
+ok(!containsBannedName('วัยต้นสามสิบ', 'ต้น'), '泰文普通词「วัยต้นสามสิบ」不误报人名「ต้น」');
+ok(containsBannedName('ฝนเดินเข้ามา', 'ฝน'), '泰文独立人名「ฝน」仍能检出');
+ok(!containsBannedName('ฝนตกหนัก', 'ฝน'), '泰文普通词「ฝนตก」不误报人名「ฝน」');
+
+{
+  const seg = clone(THAI_BOARD.episodes[0].segments[0]);
+  seg.cuts[0].characters = ['C01', 'C02']; // 两人同框——和 zh 侧 E01-06 一样触发禁双胞胎约束
+  const scene = thaiExpanded.get(1).scenes[seg.sceneIndex - 1];
+  const built = seedancePrompt(seg, { scene, contentLang: 'th' }).prompt;
+  const withoutDialogue = built.replace(/Dialogue:.*$/gm, '');
+  ok(built.includes('[SHOT 1]') && built.includes('Camera position:') && built.includes('Dialogue: {ไปกันเถอะ}'), '非中文 Seedance 用英文标签并保留原文台词');
+  ok(!/[\u0E00-\u0E7F\u3400-\u9FFF]/.test(withoutDialogue), '非中文 Seedance 除台词外不混入泰文或中文');
+  ok(built.endsWith(`[CONSTRAINTS]\n1. ${SEEDANCE_NO_SUBTITLES_EN}\n2. ${SEEDANCE_NO_TWINS_EN}`), '非中文 Seedance 默认约束也是英文');
+}
+{
+  const seg = clone(THAI_BOARD.episodes[0].segments[0]);
+  delete seg.blockingPrompt;
+  let threw = false;
+  try { seedancePrompt(seg, { contentLang: 'th' }); } catch (e) { threw = /blockingPrompt/.test(e.message); }
+  ok(threw, '非中文 Seedance 的本地语构图缺英文 override 时失败，不静默丢语义');
 }
 
 /* ---------------- 质量门：逐门击穿 ---------------- */
@@ -959,5 +999,25 @@ ok(html.includes('老周'), 'html 里 ID 换成名字');
   const doc = withRecipe();
   ok(renderMarkdown(doc, CTX).includes('| ots-shot-reverse |'), '不挂卡库时配方列退回裸 id');
   ok(renderMarkdown(FIXTURE, CTX).includes('| — |'), '没引用配方的切在配方列写 —');
+}
+
+// 泰文术语：分镜单元统一用「ช็อต」，与文档一致（ไม่ใช้คัต）
+{
+  const thHtml = renderHtml(FIXTURE, { ...CTX, lang: 'th' });
+  ok(thHtml.includes('ช็อต') && !thHtml.includes('คัต'), 'รายงานไทยใช้คำว่า ช็อต กับหน่วยสตอรีบอร์ดอย่างสม่ำเสมอ รวมถึงป้ายคุณภาพ');
+}
+
+/* ---------------- CLI 终端输出随 --lang 走 ---------------- */
+
+{
+  const cli = join(here, 'novel-storyboard.mjs');
+  const board = join(here, '..', 'examples', '渡口-storyboard.json');
+  const script = join(here, '..', 'references', 'test-fixtures', 'upstream', '渡口-script.json');
+  const th = spawnSync(process.execPath, [cli, 'checkup', board, '--script', script, '--lang', 'th'], { encoding: 'utf8' });
+  eq(th.status, 0, 'checkup ภาษาไทยทำงานสำเร็จผ่าน CLI');
+  ok(th.stdout.includes('ผ่านเกณฑ์คุณภาพทั้งหมด') && !/[㐀-鿿]/.test(th.stdout), 'ผล checkup ภาษาไทยไม่มีข้อความจีน รวมถึงป้ายช่องว่างของคำสั่งเชิงคุณภาพ');
+  const en = spawnSync(process.execPath, [cli, 'validate', board, '--script', script, '--lang', 'en'], { encoding: 'utf8' });
+  eq(en.status, 0, 'English validate succeeds through the CLI');
+  ok(en.stdout.includes('passed validation') && en.stdout.includes('segments /') && !/[㐀-鿿]/.test(en.stdout), 'English validate summary contains no Chinese UI text');
 }
 console.log(`✓ ${passed} 项自测全部通过`);

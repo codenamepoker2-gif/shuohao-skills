@@ -27,9 +27,9 @@
 | `sceneIndex` | int | 这一段在剧本该集的第几场（1 起）。段内全部分镜同场 |
 | `cuts` | cut[] | 段内分镜，按时间顺序。段总秒数 = 分镜秒数之和，**不单独存**——少一处会漂的冗余 |
 | `h3Prompt` | string | **一段一条 H3 视频提示词**，正文语言跟 `promptLang`（默认中文），结构见 `references/h3-prompt.md` |
-| `blocking` | string | **人物关系与构图逻辑**：开场那一瞬谁在画面左、谁在右、面朝哪、相距多远（厘米或步数）。一段一份，各镜从它出发。纯参考图出片时这是唯一说清「人在哪」的地方。**必填**（`composition` 门） |
-| `soundscape` | string | **Seedance 用的音景**（中文）：环境声、动作声、非语言人声，不复述台词。程序套上 `<>`，字段里别自己写 |
-| `music` | string | **Seedance 用的配乐**（中文），写配器与速度。没有就省略这个字段。程序套上 `（）` |
+| `blocking` | string | **人物关系与构图逻辑**：开场那一瞬谁在画面左、谁在右、面朝哪、相距多远（厘米或步数）。一段一份，各镜从它出发。纯参考图出片时这是唯一说清「人在哪」的地方。**必填**（`composition` 门）。`contentLang` 非 zh 时另加 `blockingPrompt` 英文对应字段 |
+| `soundscape` | string | **Seedance 用的音景**（默认中文；非 zh 内容保持内容语言）：环境声、动作声、非语言人声，不复述台词。程序套上 `<>`，字段里别自己写。`contentLang` 非 zh 时另加 `soundscapePrompt` 英文对应字段 |
+| `music` | string | **Seedance 用的配乐**（默认中文；非 zh 内容保持内容语言），写配器与速度。没有就省略这个字段。程序套上 `（）`。`contentLang` 非 zh 时另加 `musicPrompt` 英文对应字段 |
 | `note` | string | 备注，可选 |
 
 ## cut（分镜）
@@ -42,8 +42,9 @@
 | `camera` | enum | 运镜，**直接用 H3 官方词表**（原样字符串）：`Static Shot` `Push In` `Pull Out` `Zoom In/Out` `Pan Left/Right` `Truck Left/Right` `Tilt Up/Down` `Pedestal Up/Down` `Arc Shot` `Tracking Shot` `Shake Slightly/Strongly` `POV` `Roll Clockwise/Counterclockwise` |
 | `characters` | string[] | 画内人物（C 编号），必须 ⊆ 剧本该场人物；空镜给空数组。> `maxOnScreen` 时必须带 `note` |
 | `props` | string[] | 画内道具（P 编号），必须 ⊆ 剧本该场道具。可省略 |
-| `frame` | string | **分镜图提示词**（中文）：这一格的主体、位置状态、动作瞬间、光线与氛围。景别中文词必须在里面；**直呼角色名**（它指的是挂上去的设定图） |
-| `shot` | string | **镜头正文**（中文）：这几秒发生什么——运镜或切换方式 → 主体动作与表情 → 位置或空间变化，写法见 `shot-writing.md`。**用通用身份，不写角色名**；不写秒数、镜头编号、图片引用、台词和 `{}` `<>` `（）`——这些由程序加。Seedance 提示词的「画面：」行就是它 |
+| `frame` | string | **分镜图提示词**（默认中文；`contentLang` 非 zh 时必须是英文——图像模型提示词一律英文）：这一格的主体、位置状态、动作瞬间、光线与氛围。景别中文词必须在里面；**直呼角色名**（它指的是挂上去的设定图） |
+| `shot` | string | **镜头正文**（内容语言）：这几秒发生什么——运镜或切换方式 → 主体动作与表情 → 位置或空间变化，写法见 `shot-writing.md`。**用通用身份，不写角色名**；不写秒数、镜头编号、图片引用、台词和 `{}` `<>` `（）`——这些由程序加。Seedance 提示词的「画面：」行就是它。`contentLang` 非 zh 时另写英文的 `shotPrompt`（见下） |
+| `shotPrompt` | string | **给 Seedance 的英文模型提示词**：`contentLang` 为 `th` / `en` 时**每切必填**，`画面：` 行用它、`shot` 留给内容语言。语言纪律和 `shot` 相同：通用身份、不写台词和协议符号，validate 逐项检查。分段级的 `blocking` / `soundscape` / `music` 与镜级的 `lens` / `cameraPosition` / `composition` / `eyeline` / `focus` / `lighting` / `sfx` 同理——原文字段保持内容语言，另加 `*Prompt` 英文对应字段（如 `blockingPrompt`），喂模型时用英文、报告里两种都展示 |
 | `lens` | string | 焦距 + 景深：`50mm 标准，中浅景深` / `85mm 长焦，极浅景深`。这六个构图字段**每镜必填**（`composition` 门） |
 | `cameraPosition` | string | 机位：对着谁 + 什么角度，`李四 + 平视正面` / `双人 + 俯视 30°` |
 | `composition` | string | 构图法：`三分法` / `中心构图` / `对角线` / `对称` |
