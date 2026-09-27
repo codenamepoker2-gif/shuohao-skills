@@ -89,7 +89,7 @@ for f in skills/*/scripts/selftest.mjs; do node "$f"; done
 node scripts/report-selftest.mjs
 ```
 
-character-refs 244, novel-art 170, novel-characters 363, novel-outline 266, novel-script 184, novel-storyboard 346 — all passing; report assembler 113. Total 1,686 assertions, up from 1,578 at the end of Round 1, with zero assertions deleted or loosened.
+character-refs 244, novel-art 170, novel-characters 363, novel-outline 266, novel-script 184, novel-storyboard 346 — all passing; report assembler 113. Total 1,686 assertions, up from 1,630 at the end of Round 1, with zero assertions deleted or loosened.
 
 Round 2 commits (all local on `feat/th-en-i18n`, author `codenamepoker2-gif`, not pushed):
 
