@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.md)
 [![English](https://img.shields.io/badge/English-8b1a1a?style=for-the-badge)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![Follow on X](https://img.shields.io/badge/Follow-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-art
@@ -10,7 +11,7 @@ Art bibles for **AI short-drama production**: scenes + narrative props. The prem
 
 **Props** (narrative props only — close-ups, cross-episode, plot-bearing; typically 3–8 per show): dramatic function first, **state variants** (a suitcase closed and open are two references), a **scale reference** written into every prompt (AI loves rendering a handheld prop at furniture size), and **white-background, no-hands plates** — prop references get composited into shots, and a hand holding the prop is the classic contamination. Set dressing stays in scene anchors; one-off hand props are handled at shot level — neither gets its own asset.
 
-Outputs `art.json`, a Markdown report, and a self-contained `art-report.html`. Reports render with a Chinese UI by default; pass `--lang en` for a fully English report (or set a top-level `"lang": "en"` in art.json — `--lang` wins). Image prompts are always English either way: In English mode the quality-gate labels are translated too (thresholds kept as computed); failing-gate details and all data stay as authored.
+Outputs `art.json`, a Markdown report, and a self-contained `art-report.html`. The UI ships in Chinese, Thai, and English; pass `--lang th` or `--lang en`, or set top-level `lang` (the flag wins). Set `contentLang` to `zh`, `th`, or `en` so localized prop-scale values are validated correctly. Image-model prompts remain English in every mode.
 
 ![art-report.html](assets/report.webp)
 
@@ -56,6 +57,6 @@ Full spec in `references/sheet.md`.
 node scripts/selftest.mjs
 ```
 
-151 assertions — seeding, gate-defeating cases for all 10 gates, rendering (zh/en report UI), export. No model calls, runs in about a second.
+164 assertions — seeding, gate-defeating cases for all 10 gates, Thai and English content enums, rendering in all three UI languages, and export. No model calls; runs in about a second.
 
 **Only tested on macOS + Node 24.**

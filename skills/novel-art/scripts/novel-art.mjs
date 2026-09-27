@@ -7,6 +7,8 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const CONTENT_LANGS = ['zh', 'th', 'en'];
+
 /* ------------------------------------------------------------------ */
 /* slug                                                                */
 /* ------------------------------------------------------------------ */
@@ -75,7 +77,13 @@ export function seedFromOutline(outline) {
     };
   });
 
-  return { source: outline?.source ?? '', scenes, props };
+  return {
+    source: outline?.source ?? '',
+    ...(outline?.lang ? { lang: outline.lang } : {}),
+    contentLang: outline?.contentLang ?? 'zh',
+    scenes,
+    props,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,8 +96,8 @@ export function seedFromOutline(outline) {
  */
 
 const thText = (s) => typeof s === 'string' && s.trim();
-/** 中日韩表意文字与假名、谚文——出图提示词里出现就说明串语言了。 */
-const CJK = /[㐀-鿿぀-ヿ가-힯]/;
+/** 非英文内容文字——本地化字段可用泰文，但任何模型图像提示词仍必须是英文。 */
+const NON_ENGLISH_PROMPT_SCRIPT = /[㐀-鿿぀-ヿ가-힯\u0E00-\u0E7F]/;
 /** 环境参考图必须空景：反向提示词里必须把「人」禁掉。 */
 const PEOPLE_BAN = /people|human|figure|character|crowd/i;
 
@@ -104,6 +112,12 @@ export const PROP_SCALES = {
   桌面级: 'tabletop scale',
   家具级: 'furniture scale',
 };
+export const PROP_SCALES_BY_LANG = {
+  zh: PROP_SCALES,
+  th: { 'ขนาดถือด้วยมือ': 'handheld scale', 'ขนาดวางบนโต๊ะ': 'tabletop scale', 'ขนาดเฟอร์นิเจอร์': 'furniture scale' },
+  en: { handheld: 'handheld scale', tabletop: 'tabletop scale', furniture: 'furniture scale' },
+};
+const contentLangOf = (doc) => CONTENT_LANGS.includes(doc?.contentLang) ? doc.contentLang : 'zh';
 /** 道具参考图不许有手——拿着道具的手是最常见的污染。 */
 const HANDS_BAN = /hand|finger/i;
 
@@ -112,6 +126,8 @@ export function gateReport(doc, castNames = null) {
   const add = (id, label, ok, detail = '') => gates.push({ id, label, ok, detail });
   const scenes = Array.isArray(doc?.scenes) ? doc.scenes : [];
   const props = Array.isArray(doc?.props) ? doc.props : [];
+  const contentLang = contentLangOf(doc);
+  const propScales = PROP_SCALES_BY_LANG[contentLang];
   const bad = {
     anchors: [], lighting: [], people: [], english: [], names: [], variant: [],
     states: [], scale: [], hands: [], whitebg: [],
@@ -140,7 +156,7 @@ export function gateReport(doc, castNames = null) {
       ...(s?.states ?? []).map((st) => st?.prompt),
       ...(s?.image?.tags ?? []),
     ];
-    if (machine.some((v) => typeof v === 'string' && CJK.test(v))) bad.english.push(label);
+    if (machine.some((v) => typeof v === 'string' && NON_ENGLISH_PROMPT_SCRIPT.test(v))) bad.english.push(label);
 
     // 提示词不许出现角色名（给了 cast 才查）
     if (castNames?.length) {
@@ -173,9 +189,9 @@ export function gateReport(doc, castNames = null) {
     if (!Array.isArray(pr?.states) || pr.states.length === 0) bad.states.push(label);
 
     // 尺度参照：scale 枚举 + 提示词里必须出现对应英文短语
-    const scaleEn = PROP_SCALES[pr?.scale];
+    const scaleEn = propScales[pr?.scale];
     if (!scaleEn) {
-      bad.scale.push(`${label}（scale 必须是 ${Object.keys(PROP_SCALES).join('/')}）`);
+      bad.scale.push(`${label}（scale 必须是 ${Object.keys(propScales).join('/')}）`);
     } else if (![pr?.image?.prompt, pr?.image?.sheet].every((v) => typeof v === 'string' && v.includes(scaleEn))) {
       bad.scale.push(`${label}（提示词缺「${scaleEn}」）`);
     }
@@ -214,6 +230,10 @@ export function validateArt(doc, castNames = null) {
   const problems = [];
   const p = (msg) => problems.push(msg);
   if (!doc || typeof doc !== 'object') return ['art.json 不是对象'];
+
+  if (doc.contentLang !== undefined && !CONTENT_LANGS.includes(doc.contentLang)) {
+    p(`contentLang 必须是 ${CONTENT_LANGS.join('/')}，实际是 ${JSON.stringify(doc.contentLang)}`);
+  }
 
   if (!thText(doc.source)) p('缺少 source（剧名/书名）');
 
@@ -337,6 +357,18 @@ const GATE_LABELS_EN = {
   'prop-hands': 'No hands in prop plates: negatives ban hands',
   'prop-white': 'Prop sheets on pure white background, cut-out ready',
 };
+const GATE_LABELS_TH = {
+  anchors: 'จุดยึดความสม่ำเสมอ {0}–{1} จุดต่อสินทรัพย์',
+  lighting: 'มีสถานะแสงอย่างน้อยหนึ่งแบบและเขียนเป็นพรอมป์ต์',
+  'no-people': 'ภาพอ้างอิงไม่มีคน และพรอมป์ต์เชิงลบห้ามคน',
+  english: 'พรอมป์ต์สำหรับโมเดลภาพเป็นภาษาอังกฤษทั้งหมด',
+  'no-names': 'พรอมป์ต์ไม่มีชื่อตัวละคร',
+  variants: 'การอ้างอิงภาพแปรครบถ้วน',
+  'prop-states': 'อุปกรณ์มีอย่างน้อยหนึ่งสถานะและเขียนเป็นพรอมป์ต์',
+  'prop-scale': 'ระบุขนาดอุปกรณ์ในพรอมป์ต์',
+  'prop-hands': 'ภาพอุปกรณ์ไม่มีมือ และพรอมป์ต์เชิงลบห้ามมือ',
+  'prop-white': 'ภาพอุปกรณ์ใช้พื้นขาวล้วนและพร้อมตัดพื้นหลัง',
+};
 const GATE_SKIPS_EN = {
     '未提供 outline.json，本门跳过（视为通过）': 'outline.json not provided — gate skipped (treated as passing)',
     '未提供 art.json，本门跳过（视为通过）': 'art.json not provided — gate skipped (treated as passing)',
@@ -346,12 +378,14 @@ const GATE_SKIPS_EN = {
 };
 /** 报告里的门文案：英文界面取映射，未命中或中文界面回落原文。 */
 const gateText = (g, lang) => {
-  if (lang !== 'en') return { label: g.label, detail: g.detail };
-  const en = GATE_LABELS_EN[g.id];
+  if (lang === 'zh') return { label: g.label, detail: g.detail };
+  const translated = (lang === 'th' ? GATE_LABELS_TH : GATE_LABELS_EN)[g.id];
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
-  const label = en ? en.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
-  return { label, detail: GATE_SKIPS_EN[g.detail] ?? g.detail };
+  const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
+  let detail = lang === 'en' ? (GATE_SKIPS_EN[g.detail] ?? g.detail) : g.detail;
+  if (lang === 'th') detail = String(detail).replace(/^缺：/, 'ขาด: ').replace('未提供 cast.json，本门跳过（视为通过）', 'ไม่ได้ระบุ cast.json จึงข้ามด่านนี้');
+  return { label, detail };
 };
 
 const I18N = {
@@ -457,10 +491,36 @@ const I18N = {
     colon: ': ',
     colophon: 'Designs and prompts are model-generated from the outline/source text; quality gates are checked deterministically by the script. Reference images never contain people — characters are a separate asset layer; prop plates additionally ban hands and sit on a pure white background.',
   },
+  th: {
+    langCode: 'th', kicker: 'คู่มือภาพและงานศิลป์', docTitle: (s) => `${s} · คู่มือภาพและงานศิลป์`,
+    exportJson: 'ส่งออก JSON', gates: 'ด่านคุณภาพ', gatesPass: 'ผ่านทั้งหมด',
+    gatesFail: (n) => `ไม่ผ่าน ${n} ข้อ`, gatePill: (okN, total) => `ด่านคุณภาพ ${okN} / ${total}`,
+    kpi: {
+      scenes: 'ฉาก', scenesSub: (p2, v) => `ฉากหลัก ${p2}${v ? ` · ภาพแปร ${v}` : ''}`,
+      propsK: 'อุปกรณ์ประกอบเรื่อง', propsSub: (st) => `${st} สถานะ`,
+      anchors: 'จุดยึดความสม่ำเสมอ', anchorsSub: 'รายการตรวจสำหรับภาพที่สร้าง (ฉาก + อุปกรณ์)',
+      lighting: 'สถานะแสง', lightingSub: 'เปลี่ยนช่วงเวลา = สร้างภาพใหม่',
+    },
+    secList: 'รายการฉาก', secCards: 'การ์ดออกแบบฉาก', secPropList: 'รายการอุปกรณ์',
+    secPropCards: 'การ์ดออกแบบอุปกรณ์', secGates: 'ด่านคุณภาพ',
+    propListCols: ['ID', 'อุปกรณ์', 'ขนาด', 'สถานะ', 'ฉากที่เกี่ยวข้อง', 'ตอน', 'จุดยึด'],
+    statesTitle: 'สถานะอุปกรณ์', scaleLabel: 'ขนาด', relatedScenesLabel: 'ฉากที่เกี่ยวข้อง',
+    carriedByLabel: 'ตัวละครที่ถือ', propSheetCaption: 'มุมหลัก + แถบรายละเอียดด้านล่างและขวา · พื้นขาวล้วน',
+    listCols: ['ID', 'ฉาก', 'ประเภท', 'ตอน', 'จุดยึด', 'แสง', 'ภาพแปร'],
+    primaryScene: 'ฉากหลัก', onceScene: 'ใช้ครั้งเดียว', variantScene: 'ภาพแปร',
+    anchorsTitle: 'จุดยึดความสม่ำเสมอ', anchorsHint: 'ลักษณะที่ต้องปรากฏทุกครั้ง เพื่อให้ผู้ชมจำสถานที่และใช้ตรวจคุณภาพ',
+    lightingTitle: 'แสงและช่วงเวลา', usageTitle: 'ตอนที่ปรากฏ', beatsTitle: 'จุดพีคที่รองรับ',
+    variantTitle: 'ภาพแปรจาก', variantChanges: 'สิ่งที่เปลี่ยน', promptsTitle: 'ชุดพรอมป์ต์สร้างภาพ',
+    promptMaster: 'มุมหลัก (EN)', promptNegative: 'พรอมป์ต์เชิงลบ', promptSheet: 'แผ่นอ้างอิง (EN)',
+    copy: 'คัดลอก', copied: 'คัดลอกแล้ว', copyFailed: 'คัดลอกไม่สำเร็จ', copyJson: 'คัดลอก JSON ทั้งรายการ',
+    noImage: 'ยังไม่มีภาพ', noImageHint: 'สร้างด้วยพรอมป์ต์ด้านล่าง', zoomImage: 'คลิกเพื่อขยาย', closeImage: 'ปิด',
+    sheetCaption: 'มุมหลัก + แถบรายละเอียดด้านล่างและขวา', none: '—', listSep: ', ', pairSep: ' · ', colon: ': ',
+    colophon: 'โมเดลออกแบบจากโครงเรื่องหรือต้นฉบับ และสคริปต์ตรวจด่านคุณภาพแบบกำหนดผลได้ ภาพอ้างอิงฉากต้องไม่มีคน ส่วนภาพอุปกรณ์ต้องไม่มีมือและใช้พื้นขาวล้วน',
+  },
 };
 
 const tOf = (lang) => {
-  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / en');
+  if (lang && !I18N[lang]) throw new Error('报告界面语言目前内置 zh / th / en');
   return I18N[lang ?? 'zh'];
 };
 
@@ -939,11 +999,36 @@ const USAGE = `novel-art.mjs — novel-art skill 的确定性工具（场景 + �
                                          给了 cast.json 才查「提示词不含角色名」
   checkup <art.json> [--cast c.json]     只打印质量门 ✓/✗，有未过项 exit 1
   render <art.json> [--html|--md]        渲染报告到 stdout（默认 --md）
-        [--lang zh|en]                   界面语言优先级：--lang > art.json 顶层 lang 字段 > 中文
+        [--lang zh|th|en]                界面语言优先级：--lang > art.json 顶层 lang 字段 > 中文
         [--images <dir>]                 设定图所在目录，任意路径（相对当前目录解析）；
                                          默认 art.json 同级的 images/。找 <dir>/<slug>-sheet.png，
                                          找到就嵌进报告；图片路径按「报告写在 art.json 旁边」计算
   slug <name>                            场景名转安全文件名`;
+
+const CLI_TEXT = {
+  zh: { usage: USAGE, noCast: '⚠️ 没给 --cast，跳过「提示词不含角色名」检查',
+    failed: (n) => `✗ ${n} 处违规：\n`, summary: (n) => n ? `\n✗ ${n} 项未过` : '\n✓ 全部通过',
+    passed: (s, p) => `✓ ${s} 个场景${p ? ` + ${p} 件道具` : ''}全部通过校验` },
+  th: { usage: `novel-art.mjs — เครื่องมือตรวจและเรนเดอร์คู่มือภาพ\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang th]\n  checkup <art.json> [--cast cast.json] [--lang th]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir]\n  slug <name>`,
+    noCast: '⚠️ ไม่ได้ระบุ --cast จึงข้ามการตรวจชื่อตัวละครในพรอมป์ต์', failed: (n) => `✗ พบข้อผิดพลาด ${n} รายการ:\n`,
+    summary: (n) => n ? `\n✗ ไม่ผ่าน ${n} ข้อ` : '\n✓ ผ่านทั้งหมด',
+    passed: (s, p) => `✓ ฉาก ${s} ฉาก${p ? ` + อุปกรณ์ ${p} ชิ้น` : ''} ผ่านการตรวจสอบทั้งหมด` },
+  en: { usage: `novel-art.mjs — deterministic art-bible tools\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang en]\n  checkup <art.json> [--cast cast.json] [--lang en]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir]\n  slug <name>`,
+    noCast: '⚠️ No --cast provided; skipping character-name checks in prompts', failed: (n) => `✗ ${n} validation error(s):\n`,
+    summary: (n) => n ? `\n✗ ${n} gate(s) failed` : '\n✓ All passed',
+    passed: (s, p) => `✓ ${s} scene(s)${p ? ` + ${p} prop(s)` : ''} passed validation` },
+};
+const cliFor = (lang) => {
+  if (!CLI_TEXT[lang]) throw new Error('界面语言必须是 zh / th / en');
+  return CLI_TEXT[lang];
+};
+const problemText = (message, lang) => {
+  if (lang === 'zh') return message;
+  const pairs = lang === 'th'
+    ? [['质量门未过', 'ไม่ผ่านด่านคุณภาพ'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['缺 ', 'ขาด '], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ']]
+    : [['质量门未过', 'Quality gate failed'], ['缺少', 'Missing '], ['缺失', 'missing'], ['缺 ', 'missing '], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated']];
+  return pairs.reduce((text, [from, to]) => text.replaceAll(from, to), String(message));
+};
 
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(path), 'utf8'));
@@ -956,9 +1041,11 @@ function flag(rest, name, fallback = null) {
 
 function main(argv) {
   const [cmd, ...rest] = argv;
+  const explicitLang = flag(argv, '--lang', null);
+  if (explicitLang) cliFor(explicitLang);
 
   if (!cmd || cmd === '-h' || cmd === '--help') {
-    console.log(USAGE);
+    console.log(cliFor(explicitLang ?? 'zh').usage);
     process.exit(cmd ? 0 : 1);
   }
 
@@ -973,32 +1060,37 @@ function main(argv) {
     const [path] = rest;
     if (!path) throw new Error(`用法：${cmd} <art.json> [--cast cast.json]`);
     const doc = readJson(path);
+    const cliLang = explicitLang ?? doc.lang ?? 'zh';
+    const cli = cliFor(cliLang);
     const castPath = flag(rest, '--cast');
     const names = castPath ? castNamesOf(readJson(castPath)) : null;
-    if (!castPath) console.error('⚠️ 没给 --cast，跳过「提示词不含角色名」检查');
+    if (!castPath) console.error(cli.noCast);
 
     if (cmd === 'checkup') {
       const gates = gateReport(doc, names);
-      for (const g of gates) console.log(`${g.ok ? '✓' : '✗'} ${g.label}${!g.ok && g.detail ? ` — ${g.detail}` : ''}`);
+      for (const g of gates) {
+        const shown = gateText(g, cliLang);
+        console.log(`${g.ok ? '✓' : '✗'} ${shown.label}${!g.ok && shown.detail ? ` — ${shown.detail}` : ''}`);
+      }
       const failedN = gates.filter((g) => !g.ok).length;
-      console.log(failedN ? `\n✗ ${failedN} 项未过` : '\n✓ 全部通过');
+      console.log(cli.summary(failedN));
       if (failedN) process.exit(1);
       return;
     }
 
     const problems = validateArt(doc, names);
     if (problems.length) {
-      console.error(`✗ ${problems.length} 处违规：\n`);
-      for (const x of problems) console.error('  ' + x);
+      console.error(cli.failed(problems.length));
+      for (const x of problems) console.error('  ' + problemText(x, cliLang));
       process.exit(1);
     }
-    console.log(`✓ ${doc.scenes.length} 个场景${(doc.props ?? []).length ? ` + ${doc.props.length} 件道具` : ''}全部通过校验`);
+    console.log(cli.passed(doc.scenes.length, (doc.props ?? []).length));
     return;
   }
 
   if (cmd === 'render') {
     const [path] = rest;
-    if (!path) throw new Error('用法：render <art.json> [--html|--md] [--lang zh|en] [--images <dir>]');
+    if (!path) throw new Error('用法：render <art.json> [--html|--md] [--lang zh|th|en] [--images <dir>]');
     const doc = readJson(path);
     const lang = flag(rest, '--lang');
     // 图是用户在下游出好的素材，放哪由用户定：--images 按普通命令行路径解析，

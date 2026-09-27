@@ -1,5 +1,6 @@
 [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-8b1a1a?style=for-the-badge)](README.md)
 [![English](https://img.shields.io/badge/English-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.en.md)
+[![ไทย](https://img.shields.io/badge/ไทย-f2e3e3?style=for-the-badge&labelColor=f2e3e3&color=b07070)](README.th.md)
 [![关注作者 X](https://img.shields.io/badge/%E5%85%B3%E6%B3%A8%E4%BD%9C%E8%80%85-%40eternityspring-b07070?style=for-the-badge&labelColor=8b1a1a&logo=x&logoColor=f2e3e3)](https://x.com/eternityspring)
 
 # novel-art
@@ -22,7 +23,7 @@
 
 场景陈设归场景锚点、一次性手部道具镜头级提示词解决——都不单独建资产。
 
-产出 `art.json` + Markdown + 一个双击就能开的 `art-report.html`。报告界面默认中文；render 加 `--lang en` 输出全英文界面（或在 art.json 顶层写 `"lang": "en"`，`--lang` 优先）： 英文界面下质量门标签同样翻译（阈值原样），门的失败详情与数据内容保持原文。
+产出 `art.json` + Markdown + 一个双击就能开的 `art-report.html`。报告界面内置中文、泰文、英文；render 加 `--lang th` 或 `--lang en`（也可写顶层 `lang`，命令行优先）。正文语言用 `contentLang: "zh" | "th" | "en"` 指定；道具尺度枚举随正文语言变化，图像模型提示词仍全部使用英文。
 
 ![art-report.html](assets/report.webp)
 
@@ -64,6 +65,7 @@ node scripts/novel-art.mjs validate art.json --cast cast.json
 node scripts/novel-art.mjs checkup art.json                  # 只跑质量门
 node scripts/novel-art.mjs render art.json --html            # 出报告（界面默认中文）
 node scripts/novel-art.mjs render art.json --html --lang en  # 英文界面报告
+node scripts/novel-art.mjs render art.json --html --lang th  # 泰文界面报告
 ```
 
 ## 设定图的版面规格
@@ -81,7 +83,7 @@ node scripts/novel-art.mjs render art.json --html --lang en  # 英文界面报�
 SKILL.md                 给 agent 读的工作流
 scripts/
   novel-art.mjs          seed / validate / checkup / render / slug
-  selftest.mjs           151 项断言，不调模型
+  selftest.mjs           164 项断言，不调模型
 references/
   schema.md              art.json 结构 + 硬规则
   scene-pass.md          怎么填场景设定（AI 短剧的思路）
@@ -100,6 +102,6 @@ assets/
 node scripts/selftest.mjs
 ```
 
-151 项断言，覆盖 seed / 10 道门逐项击穿 / 渲染（中英界面）/ 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
+164 项断言，覆盖 seed / 10 道门逐项击穿 / 泰文与英文内容枚举 / 三语界面渲染 / 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
 
 **只在 macOS + Node 24 上实测过。** 代码没有平台相关调用，Linux 和更低版本 Node 理论上没问题，但**没验过**。

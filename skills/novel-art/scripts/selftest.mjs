@@ -175,6 +175,12 @@ eq(ANCHOR_RANGE.join('-'), '3-5', '锚点范围 3–5');
   d.scenes[0].lighting[0].prompt = '浓雾平光';
   ok(!gate(d, 'english').ok, '光照提示词写中文也被拦');
 }
+{
+  const d = clone();
+  d.contentLang = 'th';
+  d.scenes[0].image.prompt = 'ห้องโดยสารเรือไม้เก่า ไม่มีคน';
+  ok(!gate(d, 'english').ok, '泰文内容模式下图像模型提示词仍必须使用英文');
+}
 
 // G6 提示词不含角色名
 {
@@ -462,7 +468,7 @@ eq(FIXTURE.props.length, 2, '样例带两件叙事道具');
 {
   let threw = false;
   try { renderHtml(FIXTURE, 'jp'); } catch { threw = true; }
-  ok(threw, '非内置语言直接抛错（目前内置 zh / en）');
+  ok(threw, '非内置语言直接抛错（目前内置 zh / th / en）');
 }
 
 // 质量门面板是报告的一部分：英文界面下门标签也要翻译（阈值由门自己算，原样保留）
@@ -470,5 +476,58 @@ eq(FIXTURE.props.length, 2, '样例带两件叙事道具');
   const gateEn = renderHtml(FIXTURE, 'en');
   ok(gateEn.includes('Consistency anchors, 3–5'), 'EN 报告的质量门标签翻译且阈值原样保留');
   ok(!gateEn.includes('一致性锚点 3–5 个'), 'EN 报告不再出现中文门标签');
+}
+
+/* ---------------- ภาษาไทย：界面 + 内容门 ---------------- */
+
+{
+  const d = clone();
+  d.lang = 'th';
+  d.contentLang = 'th';
+  d.source = 'คืนที่ท่าเรือ';
+  d.scenes.forEach((s, i) => {
+    s.name = `ฉาก${i + 1}`;
+    s.summary = 'พื้นที่นี้เก็บร่องรอยของเรื่องราว';
+    s.anchors.forEach((a, j) => { a.name = `จุดยึด${j + 1}`; a.desc = 'รายละเอียดที่ต้องเหมือนเดิมทุกภาพ'; });
+    s.lighting.forEach((l) => { l.state = 'แสงยามค่ำ'; });
+    if (s.changes) s.changes = 'เปลี่ยนสภาพพื้นผิวและการจัดวาง';
+  });
+  const scales = ['ขนาดถือด้วยมือ', 'ขนาดถือด้วยมือ'];
+  d.props.forEach((pr, i) => {
+    pr.name = `อุปกรณ์${i + 1}`;
+    pr.summary = 'หลักฐานสำคัญของเรื่อง';
+    pr.scale = scales[i];
+    pr.anchors.forEach((a, j) => { a.name = `จุดยึด${j + 1}`; a.desc = 'รูปทรงและวัสดุต้องคงเดิม'; });
+    pr.states.forEach((st) => { st.state = 'สถานะพร้อมใช้งาน'; });
+  });
+  eq(validateArt(d, NAMES).length, 0, '美术设定全量泰文内容通过校验');
+  const th = renderHtml(d);
+  ok(th.includes('lang="th"'), '泰文报告声明 lang=th');
+  ok(th.includes('ส่งออก JSON'), '泰文报告有自然泰文导出按钮');
+  ok(th.includes('>รายการฉาก<') && th.includes('>ด่านคุณภาพ<'), '泰文报告区块标题完整');
+  ok(th.includes('จุดยึดความสม่ำเสมอ 3–5 จุด'), '泰文质量门标签翻译且阈值保留');
+  ok(!th.includes('导出 JSON') && !th.includes('Scene list'), '泰文界面不混入中英文标题');
+  ok(renderMarkdown(d).includes('## รายการฉาก'), '泰文 Markdown 使用泰文章节标题');
+  ok(d.scenes.every((s, i) => s.image.prompt === FIXTURE.scenes[i].image.prompt), '泰文内容不改英文图像模型提示词');
+}
+{
+  const d = clone();
+  d.contentLang = 'en';
+  d.props[0].scale = 'handheld';
+  d.props[1].scale = 'handheld';
+  eq(validateArt(d, NAMES).length, 0, '英文内容使用英文道具尺度枚举通过校验');
+}
+{
+  const d = clone();
+  d.contentLang = 'de';
+  ok(validateArt(d).some((x) => x.includes('contentLang')), '不支持的内容语言被结构校验拦截');
+}
+{
+  const o = JSON.parse(JSON.stringify(OUTLINE));
+  o.lang = 'th';
+  o.contentLang = 'th';
+  const d = seedFromOutline(o);
+  eq(d.lang, 'th', 'seed 从大纲传递 UI 语言');
+  eq(d.contentLang, 'th', 'seed 从大纲传递内容语言');
 }
 console.log(`✓ ${passed} 项自测全部通过`);
