@@ -266,6 +266,7 @@ table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}th,td{te
 .extra .img{height:180px;max-width:100%;object-fit:contain;border:1px solid var(--rule);border-radius:2px;background:#fff}
 @media(max-width:700px){.vbody{flex-direction:column}.extra{align-self:center}}
 img.img{cursor:zoom-in}.lb{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center}.lb.on{display:flex}.lb img{max-width:94vw;max-height:94vh}
+html:lang(th) h1,html:lang(th) h2,html:lang(th) label,html:lang(th) button,html:lang(th) em{letter-spacing:normal}
 </style></head><body><main>
 <h1>${esc(ui.title)}</h1>
 <p class="lead">${esc(ui.lead)}</p>
@@ -400,7 +401,7 @@ async function main(argv) {
       process.exit(1);
     }
     console.log(confirmTable(x));
-    console.log('\n〔推断〕〔默认〕是自动补的，请用户逐条看过；没问题再运行 new。');
+    console.log(x.lang === 'th' ? '\n〔อนุมาน〕〔ค่าเริ่มต้น〕คือข้อมูลที่เติมอัตโนมัติ โปรดตรวจทีละรายการก่อนเรียก new' : x.lang === 'en' ? '\n〔Inferred〕〔Default〕values were filled automatically. Review each item before running new.' : '\n〔推断〕〔默认〕是自动补的，请用户逐条看过；没问题再运行 new。');
     return;
   }
 

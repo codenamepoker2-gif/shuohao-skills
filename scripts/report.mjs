@@ -467,6 +467,7 @@ body{
 
 /* ---- 各面板自己的样式，已加作用域前缀 ---- */
 ${panes.map((p) => `/* ===== ${p.id} ===== */\n${p.css}`).join('\n')}
+html:lang(th) .rp-brand h1,html:lang(th) .rp-brand p,html:lang(th) .rp-navlab{letter-spacing:normal}
 </style>
 </head>
 <body>

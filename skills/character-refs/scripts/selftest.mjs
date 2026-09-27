@@ -475,6 +475,13 @@ const serve = (handler) => new Promise((ok_) => {
   ok(en.includes('十六岁采茶姑娘'), '数据内容保持原文（角色描述是中文写的就还是中文）');
   const thaiHtml = renderHtml([{ asset: assetFromIntake(THAI_INTAKE), assetDir: TMP }], TMP);
   ok(thaiHtml.includes('<html lang="th">') && thaiHtml.includes('ภาพอ้างอิงตัวละคร') && thaiHtml.includes('มุมมองทั้งหมด'), '泰文资产默认渲染完整泰文报告界面');
+  ok(thaiHtml.includes('html:lang(th) h1,html:lang(th) h2,html:lang(th) label,html:lang(th) button,html:lang(th) em{letter-spacing:normal}'), 'Thai typography preserves combining glyphs');
+  const thaiCheck = run('intake-check', join(here, '..', 'examples', 'มะลิ-intake.json'));
+  ok(thaiCheck.status === 0 && thaiCheck.stdout.includes('โปรดตรวจทีละรายการ') && !thaiCheck.stdout.includes('〔推断〕'), 'Thai intake hint is localized');
+  const englishIntakePath = join(TMP, 'english-intake.json');
+  writeFileSync(englishIntakePath, JSON.stringify({ ...INTAKE, lang: 'en' }));
+  const englishCheck = run('intake-check', englishIntakePath);
+  ok(englishCheck.status === 0 && englishCheck.stdout.includes('Review each item') && !englishCheck.stdout.includes('〔推断〕'), 'English intake hint is localized');
   ok(thaiHtml.includes('หญิงขายดอกไม้อายุยี่สิบสี่ปี'), '泰文报告保留泰文角色内容');
   const uiFile = join(TMP, 'ui-fr.json');
   writeFileSync(uiFile, JSON.stringify({ ...uiTemplate('fr'), title: 'Références de personnage' }));

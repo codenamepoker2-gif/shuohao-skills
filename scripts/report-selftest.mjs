@@ -263,6 +263,7 @@ const DOC = `<!doctype html><html lang="zh"><head><meta charset="utf-8">
   const panes = PANES.map(meta => ({ ...makePane(DOC, { id: meta.id }), meta }));
   const th = renderShell(panes, { title: 'เรื่องที่ท่าเรือ', lang: 'th' });
   ok(th.includes('<html lang="th">'), 'Thai document language');
+  ok(th.includes('html:lang(th) .rp-brand h1,html:lang(th) .rp-brand p,html:lang(th) .rp-navlab{letter-spacing:normal}'), 'Thai shell typography preserves combining glyphs');
   ok(th.includes('รายงานการผลิตละครสั้น'), 'Thai report heading');
   ok(th.includes('แสดงทั้งหมด'), 'Thai show-all button');
   ok(th.includes('กลับไปแสดงทีละส่วน'), 'Thai collapse control');
