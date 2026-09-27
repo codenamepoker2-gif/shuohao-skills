@@ -21,7 +21,7 @@
 ตัวอย่างการใช้งาน:
 
 ```bash
-node scripts/novel-art.mjs render examples/渡口-art.json --html --lang th > /tmp/art-th.html
+node scripts/novel-art.mjs render examples/渡口-art.json --html --lang th --cast cast.json > /tmp/art-th.html
 node scripts/novel-art.mjs render examples/渡口-art.json --html --lang en > /tmp/art-en.html
 ```
 
@@ -34,7 +34,7 @@ node scripts/novel-art.mjs render examples/渡口-art.json --html --lang en > /t
 1. มี `outline.json` ให้ใช้ `seed` เติมรายชื่อฉากและอุปกรณ์พร้อมตอนที่ปรากฏแบบกำหนดผลได้
 2. เขียนจุดยึดความสม่ำเสมอ สถานะแสง และพรอมต์แผ่นอ้างอิงของแต่ละฉากและอุปกรณ์
 3. ใช้ `validate --cast cast.json` ไล่ตรวจพรอมต์กับรายชื่อตัวละครจนผ่านทุกด่าน
-4. ใช้ `render --lang th` ออกรายงานภาษาไทย
+4. ใช้ `render --lang th --cast cast.json` ออกรายงานภาษาไทย พร้อมแสดงผลด่านตรวจชื่อตัวละครจริง หากไม่ส่ง `--cast` รายงานจะระบุชัดว่าข้ามด่านนี้
 
 คำสั่งหลัก:
 
@@ -42,7 +42,7 @@ node scripts/novel-art.mjs render examples/渡口-art.json --html --lang en > /t
 node scripts/novel-art.mjs seed outline.json > art.json
 node scripts/novel-art.mjs validate art.json --cast cast.json
 node scripts/novel-art.mjs checkup art.json
-node scripts/novel-art.mjs render art.json --html --lang th > art-report.html
+node scripts/novel-art.mjs render art.json --html --lang th --cast cast.json > art-report.html
 node scripts/selftest.mjs
 ```
 

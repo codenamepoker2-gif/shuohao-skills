@@ -27,7 +27,7 @@ novel-characters → cast.json    (who: character assets)
 novel-art        → art.json     (where & what they hold: art assets)
 ```
 
-`seed <outline.json>` prefills both the scene list and the prop list deterministically, carrying over the episodes each one appears in and the beats it serves; if the outline has no `props`, the prop list is left empty and the model extracts it from the text per `prop-pass.md`. `validate --cast` cross-checks prompts against the character roster. Surface wording is environment-flavoured rather than the character skill's skin detail. The rendering style is not written into prompts at all — the caller prepends it at generation time.
+`seed <outline.json>` prefills both the scene list and the prop list deterministically, carrying over the episodes each one appears in and the beats it serves; if the outline has no `props`, the prop list is left empty and the model extracts it from the text per `prop-pass.md`. `validate --cast` cross-checks prompts against the character roster. Pass the same optional `--cast cast.json` to `render` so the report shows the actual name-gate result; without it, the report explicitly marks that gate as skipped. Surface wording is environment-flavoured rather than the character skill's skin detail. The rendering style is not written into prompts at all — the caller prepends it at generation time.
 
 ## CLI
 
@@ -36,7 +36,7 @@ node scripts/novel-art.mjs seed outline.json > art.json
 node scripts/novel-art.mjs validate art.json --cast cast.json
 node scripts/novel-art.mjs checkup art.json
 node scripts/novel-art.mjs render art.json --html             # Chinese report UI (default)
-node scripts/novel-art.mjs render art.json --html --lang en   # English report UI
+node scripts/novel-art.mjs render art.json --html --lang en --cast cast.json   # English report UI with the name gate checked
 ```
 
 ## Sheet layout spec
@@ -57,6 +57,6 @@ Full spec in `references/sheet.md`.
 node scripts/selftest.mjs
 ```
 
-164 assertions — seeding, gate-defeating cases for all 10 gates, Thai and English content enums, rendering in all three UI languages, and export. No model calls; runs in about a second.
+170 assertions — seeding, gate-defeating cases for all 10 gates, `render --cast`, Thai and English content enums, rendering in all three UI languages, and export. No model calls; runs in about a second.
 
 **Only tested on macOS + Node 24.**

@@ -383,8 +383,11 @@ const gateText = (g, lang) => {
   // 阈值仍由门自己算：把中文标签里出现的数字按序填进 {0} {1}
   const nums = String(g.label).match(/\d+(?:\.\d+)?/g) ?? [];
   const label = translated ? translated.replace(/\{(\d)\}/g, (m, i) => nums[Number(i)] ?? m) : g.label;
-  let detail = lang === 'en' ? (GATE_SKIPS_EN[g.detail] ?? g.detail) : g.detail;
-  if (lang === 'th') detail = String(detail).replace(/^缺：/, 'ขาด: ').replace('未提供 cast.json，本门跳过（视为通过）', 'ไม่ได้ระบุ cast.json จึงข้ามด่านนี้');
+  const skipped = lang === 'en' ? GATE_SKIPS_EN[g.detail]
+    : g.detail === '未提供 cast.json，本门跳过（视为通过）' ? 'ไม่ได้ระบุ cast.json จึงข้ามด่านนี้' : null;
+  const detail = skipped ?? (g.detail ? (lang === 'th'
+    ? 'พบข้อมูลที่ไม่ผ่านด่านนี้ โปรดเรียก validate เพื่อดูตำแหน่งที่ต้องแก้'
+    : 'This gate has failing items; run validate for exact locations') : '');
   return { label, detail };
 };
 
@@ -610,10 +613,10 @@ function embedDoc(doc) {
   return JSON.stringify(doc).replace(/</g, '\\u003c');
 }
 
-export function renderHtml(doc, lang = null) {
+export function renderHtml(doc, lang = null, castNames = null) {
   const code = lang ?? doc?.lang ?? 'zh';
   const t = tOf(code);
-  const gates = gateReport(doc);
+  const gates = gateReport(doc, castNames);
   const failed = gates.filter((g) => !g.ok);
   const scenes = doc.scenes;
   const props = doc.props ?? [];
@@ -730,7 +733,7 @@ export function renderHtml(doc, lang = null) {
   ${gates
     .map(
       (g) => `<li class="${g.ok ? 'ok' : 'bad'}"><span class="m">${g.ok ? '✓' : '✗'}</span><span>${esc(gateText(g, t.langCode).label)}${
-        !g.ok && g.detail ? `<small>${esc(g.detail)}</small>` : g.id === 'no-names' && g.detail ? `<small>${esc(g.detail)}</small>` : ''
+        !g.ok && g.detail ? `<small>${esc(gateText(g, t.langCode).detail)}</small>` : g.id === 'no-names' && g.detail ? `<small>${esc(gateText(g, t.langCode).detail)}</small>` : ''
       }</span></li>`,
     )
     .join('\n  ')}
@@ -750,6 +753,7 @@ export function renderHtml(doc, lang = null) {
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
+html:lang(th) .hd h1,html:lang(th) .kpi .l,html:lang(th) .sec-h h2,html:lang(th) th,html:lang(th) .sc-h h3,html:lang(th) .plate figcaption,html:lang(th) .blk h4,html:lang(th) .copy{letter-spacing:normal}
 body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
 .page{max-width:1600px;margin:0 auto;padding:24px 32px 90px}
 h1,h2,h3,h4{margin:0;font-weight:400}
@@ -999,6 +1003,7 @@ const USAGE = `novel-art.mjs — novel-art skill 的确定性工具（场景 + �
                                          给了 cast.json 才查「提示词不含角色名」
   checkup <art.json> [--cast c.json]     只打印质量门 ✓/✗，有未过项 exit 1
   render <art.json> [--html|--md]        渲染报告到 stdout（默认 --md）
+        [--cast cast.json]               在报告中执行角色名检查；不提供则明确标为跳过
         [--lang zh|th|en]                界面语言优先级：--lang > art.json 顶层 lang 字段 > 中文
         [--images <dir>]                 设定图所在目录，任意路径（相对当前目录解析）；
                                          默认 art.json 同级的 images/。找 <dir>/<slug>-sheet.png，
@@ -1009,11 +1014,11 @@ const CLI_TEXT = {
   zh: { usage: USAGE, noCast: '⚠️ 没给 --cast，跳过「提示词不含角色名」检查',
     failed: (n) => `✗ ${n} 处违规：\n`, summary: (n) => n ? `\n✗ ${n} 项未过` : '\n✓ 全部通过',
     passed: (s, p) => `✓ ${s} 个场景${p ? ` + ${p} 件道具` : ''}全部通过校验` },
-  th: { usage: `novel-art.mjs — เครื่องมือตรวจและเรนเดอร์คู่มือภาพ\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang th]\n  checkup <art.json> [--cast cast.json] [--lang th]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir]\n  slug <name>`,
+  th: { usage: `novel-art.mjs — เครื่องมือตรวจและเรนเดอร์คู่มือภาพ\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang th]\n  checkup <art.json> [--cast cast.json] [--lang th]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir] [--cast cast.json]\n  slug <name>`,
     noCast: '⚠️ ไม่ได้ระบุ --cast จึงข้ามการตรวจชื่อตัวละครในพรอมป์ต์', failed: (n) => `✗ พบข้อผิดพลาด ${n} รายการ:\n`,
     summary: (n) => n ? `\n✗ ไม่ผ่าน ${n} ข้อ` : '\n✓ ผ่านทั้งหมด',
     passed: (s, p) => `✓ ฉาก ${s} ฉาก${p ? ` + อุปกรณ์ ${p} ชิ้น` : ''} ผ่านการตรวจสอบทั้งหมด` },
-  en: { usage: `novel-art.mjs — deterministic art-bible tools\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang en]\n  checkup <art.json> [--cast cast.json] [--lang en]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir]\n  slug <name>`,
+  en: { usage: `novel-art.mjs — deterministic art-bible tools\n\n  seed <outline.json>\n  validate <art.json> [--cast cast.json] [--lang en]\n  checkup <art.json> [--cast cast.json] [--lang en]\n  render <art.json> [--html|--md] [--lang zh|th|en] [--images dir] [--cast cast.json]\n  slug <name>`,
     noCast: '⚠️ No --cast provided; skipping character-name checks in prompts', failed: (n) => `✗ ${n} validation error(s):\n`,
     summary: (n) => n ? `\n✗ ${n} gate(s) failed` : '\n✓ All passed',
     passed: (s, p) => `✓ ${s} scene(s)${p ? ` + ${p} prop(s)` : ''} passed validation` },
@@ -1022,12 +1027,20 @@ const cliFor = (lang) => {
   if (!CLI_TEXT[lang]) throw new Error('界面语言必须是 zh / th / en');
   return CLI_TEXT[lang];
 };
+const usageError = (lang, command) => {
+  const args = command === 'seed' ? '<outline.json>'
+    : command === 'slug' ? '<name>'
+      : command === 'render' ? '<art.json> [--html|--md] [--lang zh|th|en] [--images dir] [--cast cast.json]'
+        : '<art.json> [--cast cast.json]';
+  return lang === 'th' ? `วิธีใช้: ${command} ${args}` : lang === 'en' ? `Usage: ${command} ${args}` : `用法：${command} ${args}`;
+};
 const problemText = (message, lang) => {
   if (lang === 'zh') return message;
   const pairs = lang === 'th'
-    ? [['质量门未过', 'ไม่ผ่านด่านคุณภาพ'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['缺 ', 'ขาด '], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ']]
-    : [['质量门未过', 'Quality gate failed'], ['缺少', 'Missing '], ['缺失', 'missing'], ['缺 ', 'missing '], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated']];
-  return pairs.reduce((text, [from, to]) => text.replaceAll(from, to), String(message));
+    ? [['art.json 不是对象', 'art.json ต้องเป็นอ็อบเจ็กต์'], ['缺少', 'ขาด '], ['缺失', 'ขาด'], ['缺 ', 'ขาด '], ['为空', 'ว่าง'], ['必须是', 'ต้องเป็น'], ['不存在', 'ไม่มีอยู่'], ['重复', 'ซ้ำ']]
+    : [['art.json 不是对象', 'art.json must be an object'], ['缺少', 'Missing '], ['缺失', 'missing'], ['缺 ', 'missing '], ['为空', 'is empty'], ['必须是', 'must be'], ['不存在', 'does not exist'], ['重复', 'is duplicated']];
+  const translated = pairs.reduce((text, [from, to]) => text.replaceAll(from, to), String(message));
+  return translated.replace(/[\u3400-\u9fff]+/g, lang === 'th' ? 'ข้อกำหนด' : 'validation requirement');
 };
 
 function readJson(path) {
@@ -1038,6 +1051,8 @@ function flag(rest, name, fallback = null) {
   const i = rest.indexOf(name);
   return i >= 0 && rest[i + 1] ? rest[i + 1] : fallback;
 }
+const inputPath = (rest) => rest.find((value, index) =>
+  !value.startsWith('--') && !['--lang', '--cast', '--images'].includes(rest[index - 1]));
 
 function main(argv) {
   const [cmd, ...rest] = argv;
@@ -1050,15 +1065,15 @@ function main(argv) {
   }
 
   if (cmd === 'seed') {
-    const [path] = rest;
-    if (!path) throw new Error('用法：seed <outline.json>');
+    const path = inputPath(rest);
+    if (!path) throw new Error(usageError(explicitLang ?? 'zh', 'seed'));
     console.log(JSON.stringify(seedFromOutline(readJson(path)), null, 2));
     return;
   }
 
   if (cmd === 'validate' || cmd === 'checkup') {
-    const [path] = rest;
-    if (!path) throw new Error(`用法：${cmd} <art.json> [--cast cast.json]`);
+    const path = inputPath(rest);
+    if (!path) throw new Error(usageError(explicitLang ?? 'zh', cmd));
     const doc = readJson(path);
     const cliLang = explicitLang ?? doc.lang ?? 'zh';
     const cli = cliFor(cliLang);
@@ -1081,7 +1096,12 @@ function main(argv) {
     const problems = validateArt(doc, names);
     if (problems.length) {
       console.error(cli.failed(problems.length));
-      for (const x of problems) console.error('  ' + problemText(x, cliLang));
+      const structural = problems.filter((x) => !x.startsWith('质量门未过：'));
+      for (const x of structural) console.error('  ' + problemText(x, cliLang));
+      for (const g of gateReport(doc, names).filter((g) => !g.ok)) {
+        const shown = gateText(g, cliLang);
+        console.error(`  ${shown.label}${shown.detail ? ` — ${shown.detail}` : ''}`);
+      }
       process.exit(1);
     }
     console.log(cli.passed(doc.scenes.length, (doc.props ?? []).length));
@@ -1089,8 +1109,8 @@ function main(argv) {
   }
 
   if (cmd === 'render') {
-    const [path] = rest;
-    if (!path) throw new Error('用法：render <art.json> [--html|--md] [--lang zh|th|en] [--images <dir>]');
+    const path = inputPath(rest);
+    if (!path) throw new Error(usageError(explicitLang ?? 'zh', 'render'));
     const doc = readJson(path);
     const lang = flag(rest, '--lang');
     // 图是用户在下游出好的素材，放哪由用户定：--images 按普通命令行路径解析，
@@ -1099,21 +1119,25 @@ function main(argv) {
     const outDir = resolve(path, '..');
     const imagesFlag = flag(rest, '--images');
     const imagesDir = imagesFlag ? resolve(imagesFlag) : join(outDir, 'images');
+    const castPath = flag(rest, '--cast');
+    const names = castPath ? castNamesOf(readJson(castPath)) : null;
     for (const item of [...doc.scenes, ...(doc.props ?? [])]) {
       const abs = join(imagesDir, `${slug(item.name)}-sheet.png`);
       if (existsSync(abs)) item.sheetImage = relative(outDir, abs).split(sep).join('/');
     }
-    process.stdout.write((rest.includes('--html') ? renderHtml(doc, lang) : renderMarkdown(doc, lang)) + '\n');
+    process.stdout.write((rest.includes('--html') ? renderHtml(doc, lang, names) : renderMarkdown(doc, lang)) + '\n');
     return;
   }
 
   if (cmd === 'slug') {
-    if (!rest[0]) throw new Error('用法：slug <name>');
+    if (!rest[0]) throw new Error(usageError(explicitLang ?? 'zh', 'slug'));
     console.log(slug(rest[0]));
     return;
   }
 
-  throw new Error(`未知命令 ${cmd}\n\n${USAGE}`);
+  const cliLang = explicitLang ?? 'zh';
+  const unknown = cliLang === 'th' ? `ไม่รู้จักคำสั่ง ${cmd}` : cliLang === 'en' ? `Unknown command ${cmd}` : `未知命令 ${cmd}`;
+  throw new Error(`${unknown}\n\n${cliFor(cliLang).usage}`);
 }
 
 // 软链安装时 argv[1] 是链接路径，两边都取 realpath 才能比得上

@@ -91,4 +91,5 @@
 ```bash
 node scripts/novel-art.mjs validate art.json --cast cast.json
 node scripts/novel-art.mjs checkup art.json               # 只打印 10 道门 ✓/✗
+node scripts/novel-art.mjs render art.json --html --cast cast.json # 报告也执行角色名检查；不传则明确标为跳过
 ```

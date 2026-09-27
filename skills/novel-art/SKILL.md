@@ -102,11 +102,11 @@ node {baseDir}/scripts/novel-art.mjs validate <art.json> --cast <cast.json>
 
 ```bash
 cd <输出目录>
-node {baseDir}/scripts/novel-art.mjs render <剧名>-art.json --md   > <剧名>-art.md
-node {baseDir}/scripts/novel-art.mjs render <剧名>-art.json --html > art-report.html
+node {baseDir}/scripts/novel-art.mjs render <剧名>-art.json --md   --cast <cast.json> > <剧名>-art.md
+node {baseDir}/scripts/novel-art.mjs render <剧名>-art.json --html --cast <cast.json> > art-report.html
 ```
 
-报告界面内置中、泰、英三语；用户要切界面就加 `--lang th` 或 `--lang en`（或在 art.json 顶层写 `lang` 字段，`--lang` 优先）。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`）。`render` 默认去 art.json 同级的 `images/<slug>-sheet.png` 找图（场景和道具都找），图在别处就用 `--images <目录>` 指过去——**本 skill 不产生这些文件**，下游出完图重跑一次 render 就能嵌进报告。报告含：KPI 带、场景清单、场景设定卡、道具清单、道具设定卡（锚点核对表 / 状态变体 / 提示词包全带复制按钮）、质量门面板、导出 JSON（下载的就是 art.json 原样）。
+报告界面内置中、泰、英三语；用户要切界面就加 `--lang th` 或 `--lang en`（或在 art.json 顶层写 `lang` 字段，`--lang` 优先）。正文语言用 `contentLang: "zh" | "th" | "en"` 指定（默认 `zh`）。`render` 可选接收 `--cast <cast.json>`，传入后报告会真实执行「提示词不含角色名」质量门；不传则按界面语言明确标为跳过。`render` 默认去 art.json 同级的 `images/<slug>-sheet.png` 找图（场景和道具都找），图在别处就用 `--images <目录>` 指过去——**本 skill 不产生这些文件**，下游出完图重跑一次 render 就能嵌进报告。报告含：KPI 带、场景清单、场景设定卡、道具清单、道具设定卡（锚点核对表 / 状态变体 / 提示词包全带复制按钮）、质量门面板、导出 JSON（下载的就是 art.json 原样）。
 
 汇报一句话说清：几个场景（主场景/变体各几）、几件道具、锚点总数、报告路径；没过的门明说。
 
@@ -148,7 +148,7 @@ seed 吃 outline.json 的场景与道具两块（大纲没有 `props` 时道具�
 node {baseDir}/scripts/selftest.mjs
 ```
 
-151 项断言，不调模型、不花额度。10 道质量门每一道都有击穿用例。改完脚本先跑这个。
+170 项断言，不调模型、不花额度。10 道质量门每一道都有击穿用例，并覆盖 `render --cast` 与泰英 CLI。改完脚本先跑这个。
 
 ## 自带样例
 

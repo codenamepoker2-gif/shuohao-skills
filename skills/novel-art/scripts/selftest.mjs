@@ -4,6 +4,7 @@
 //   node scripts/selftest.mjs
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -307,6 +308,11 @@ ok(/e\.key === 'Escape'/.test(html), 'Esc 关闭弹层');
 eq((html.match(/<li class="ok">/g) || []).length, 10, '10 道质量门全 ✓');
 ok(html.includes('gatepill pass'), '页眉徽章通过态');
 ok(html.includes('未提供 cast.json'), '报告如实标注角色名检查被跳过');
+{
+  const withCast = renderHtml(FIXTURE, 'th', castNamesOf(CAST));
+  ok(!withCast.includes('ไม่ได้ระบุ cast.json'), 'ส่งรายชื่อตัวละครให้รายงานแล้วไม่แสดงว่าข้ามด่าน');
+  ok(withCast.includes('html:lang(th) .hd h1'), 'รูปแบบอักษรไทยยกเลิกระยะห่างตัวอักษรในหัวเรื่องและป้ายกำกับ');
+}
 
 // 质量门失败也要渲染
 {
@@ -529,5 +535,16 @@ eq(FIXTURE.props.length, 2, '样例带两件叙事道具');
   const d = seedFromOutline(o);
   eq(d.lang, 'th', 'seed 从大纲传递 UI 语言');
   eq(d.contentLang, 'th', 'seed 从大纲传递内容语言');
+}
+{
+  const cli = join(here, 'novel-art.mjs');
+  const art = join(here, '..', 'examples', '渡口-art.json');
+  const cast = join(here, '..', 'references', 'test-fixtures', 'upstream', '渡口-cast.json');
+  const rendered = spawnSync(process.execPath, [cli, 'render', art, '--html', '--lang', 'th', '--cast', cast], { encoding: 'utf8' });
+  eq(rendered.status, 0, 'render --cast ทำงานสำเร็จผ่าน CLI');
+  ok(!rendered.stdout.includes('ไม่ได้ระบุ cast.json'), 'render --cast ส่งรายชื่อตัวละครเข้า quality gate จริง');
+  const checked = spawnSync(process.execPath, [cli, 'checkup', art, '--lang', 'th', '--cast', cast], { encoding: 'utf8' });
+  eq(checked.status, 0, 'checkup ภาษาไทยทำงานสำเร็จ');
+  ok(checked.stdout.includes('ผ่านทั้งหมด') && !checked.stdout.includes('全部通过'), 'สรุปผล CLI ภาษาไทยไม่มีข้อความจีน');
 }
 console.log(`✓ ${passed} 项自测全部通过`);

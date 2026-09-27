@@ -56,6 +56,7 @@ novel-art        → art.json     （哪里 + 手里拿的：美术资产）
 
 - `seed <outline.json>` 确定性预填场景与道具两张清单，连出现集、承载爽点一起搬；大纲没有 `props` 时道具留空，模型按 `prop-pass.md` 从原文提取
 - `validate --cast <cast.json>` 用角色表查提示词里有没有混进角色名
+- `render --cast <cast.json>` 把同一份角色表传进报告的质量门；不提供时报告明确写明跳过
 
 ## 命令行直接用
 
@@ -63,7 +64,7 @@ novel-art        → art.json     （哪里 + 手里拿的：美术资产）
 node scripts/novel-art.mjs seed outline.json > art.json      # 从大纲预填场景骨架
 node scripts/novel-art.mjs validate art.json --cast cast.json
 node scripts/novel-art.mjs checkup art.json                  # 只跑质量门
-node scripts/novel-art.mjs render art.json --html            # 出报告（界面默认中文）
+node scripts/novel-art.mjs render art.json --html --cast cast.json # 出报告并执行角色名检查（界面默认中文）
 node scripts/novel-art.mjs render art.json --html --lang en  # 英文界面报告
 node scripts/novel-art.mjs render art.json --html --lang th  # 泰文界面报告
 ```
@@ -83,7 +84,7 @@ node scripts/novel-art.mjs render art.json --html --lang th  # 泰文界面报�
 SKILL.md                 给 agent 读的工作流
 scripts/
   novel-art.mjs          seed / validate / checkup / render / slug
-  selftest.mjs           164 项断言，不调模型
+  selftest.mjs           170 项断言，不调模型
 references/
   schema.md              art.json 结构 + 硬规则
   scene-pass.md          怎么填场景设定（AI 短剧的思路）
@@ -102,6 +103,6 @@ assets/
 node scripts/selftest.mjs
 ```
 
-164 项断言，覆盖 seed / 10 道门逐项击穿 / 泰文与英文内容枚举 / 三语界面渲染 / 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
+170 项断言，覆盖 seed / 10 道门逐项击穿 / `render --cast` / 泰文与英文内容枚举 / 三语界面渲染 / 导出。不调模型、不花额度、1 秒跑完。改完脚本先跑这个。
 
 **只在 macOS + Node 24 上实测过。** 代码没有平台相关调用，Linux 和更低版本 Node 理论上没问题，但**没验过**。
